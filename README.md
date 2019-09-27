@@ -4,7 +4,7 @@
 
 Branch|Build Status
 ---|---
-Master|[![master](https://travis-ci.org/mixbytes/eosio.contracts.svg?branch=master)](https://travis-ci.org/mixbytes/eosio.contracts)
+Master|[![master](https://travis-ci.org/DaoCasino/DAOBET.contracts.svg?branch=master)](https://travis-ci.org/DaoCasino/DAOBET.contracts)
 
 ## Contributing to DAOBET Blockchain
 
