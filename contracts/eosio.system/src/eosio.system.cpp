@@ -6,7 +6,6 @@
 #include "delegate_bandwidth.cpp"
 #include "voting.cpp"
 #include "exchange_state.cpp"
-#include "rex.cpp"
 
 namespace eosiosystem {
 
@@ -18,11 +17,7 @@ namespace eosiosystem {
     _global(_self, _self.value),
     _global2(_self, _self.value),
     _global3(_self, _self.value),
-    _rammarket(_self, _self.value),
-    _rexpool(_self, _self.value),
-    _rexfunds(_self, _self.value),
-    _rexbalance(_self, _self.value),
-    _rexorders(_self, _self.value)
+    _rammarket(_self, _self.value)
    {
       //print( "construct system\n" );
       _gstate  = _global.exists() ? _global.get() : get_default_parameters();
@@ -452,9 +447,6 @@ namespace eosiosystem {
          m.quote.balance.amount = system_token_supply.amount / 1000;
          m.quote.balance.symbol = core;
       });
-
-      INLINE_ACTION_SENDER(eosio::token, open)( token_account, { _self, active_permission },
-                                                { rex_account, core, _self } );
    }
 
 } /// eosio.system
@@ -466,9 +458,6 @@ EOSIO_DISPATCH( eosiosystem::system_contract,
      // eosio.system.cpp
      (init)(setram)(setramrate)(setparams)(setpriv)(setalimits)(setacctram)(setacctnet)(setacctcpu)
      (rmvproducer)(updtrevision)(bidname)(bidrefund)
-     // rex.cpp
-     (deposit)(withdraw)(buyrex)(unstaketorex)(sellrex)(cnclrexorder)(rentcpu)(rentnet)(fundcpuloan)(fundnetloan)
-     (defcpuloan)(defnetloan)(updaterex)(consolidate)(mvtosavings)(mvfrsavings)(setrex)(rexexec)(closerex)
      // delegate_bandwidth.cpp
      (buyrambytes)(buyram)(sellram)(delegatebw)(undelegatebw)(refund)
      // voting.cpp
