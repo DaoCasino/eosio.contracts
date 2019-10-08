@@ -17,12 +17,13 @@ namespace eosiosystem {
     _global(_self, _self.value),
     _global2(_self, _self.value),
     _global3(_self, _self.value),
-    _rammarket(_self, _self.value)
+    _rammarket(_self, _self.value),
+    _contracts_version(_self, _self.value)
    {
-      //print( "construct system\n" );
       _gstate  = _global.exists() ? _global.get() : get_default_parameters();
       _gstate2 = _global2.exists() ? _global2.get() : eosio_global_state2{};
       _gstate3 = _global3.exists() ? _global3.get() : eosio_global_state3{};
+      _contracts_version.set(version_info{CONTRACTS_VERSION}, _self);
    }
 
    eosio_global_state system_contract::get_default_parameters() {
