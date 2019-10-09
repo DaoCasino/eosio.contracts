@@ -2,9 +2,19 @@ cmake_minimum_required(VERSION 3.5)
 
 project(eosio_contracts)
 
-set(VERSION_MAJOR 1)
-set(VERSION_MINOR 6)
-set(VERSION_PATCH 0)
+execute_process(COMMAND git describe --tags
+	OUTPUT_VARIABLE GIT_TAG
+                ERROR_QUIET)
+string(SUBSTRING "${GIT_TAG}" 1 5 VER_FULL)
+message(STATUS "${PROJECT} version: ${VER_FULL}")
+string(REPLACE "." ";" VER_LIST ${VER_FULL})
+list(GET VER_LIST 0 VER_MAJOR)
+list(GET VER_LIST 1 VER_MINOR)
+list(GET VER_LIST 2 VER_PATCH)
+
+set(VERSION_MAJOR ${VER_MAJOR})
+set(VERSION_MINOR ${VER_MINOR})
+set(VERSION_PATCH ${VER_PATCH})
 #set(VERSION_SUFFIX rc3)
 
 if (VERSION_SUFFIX)
@@ -84,3 +94,9 @@ ExternalProject_Add(
   TEST_COMMAND   ""
   INSTALL_COMMAND ""
 )
+
+add_custom_target(create_tar ALL COMMAND
+  mkdir -p assets &&
+	tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*' -f "assets/contracts-${VERSION_FULL}.tar.gz" "contracts" --transform='s/contracts/contracts-${VERSION_FULL}/g'
+	)
+add_dependencies(create_tar contracts_unit_tests)

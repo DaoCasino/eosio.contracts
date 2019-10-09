@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+
+JOB=$1
+
+# build
+function build(){
+  docker run \
+    --rm \
+    -v `pwd`:/haya/contracts \
+    -v `pwd`/.ccache:/root/.ccache \
+    -w /haya/contracts \
+    -ti mixbytes/haya:devel \
+    ./cicd/build.sh
+}
+
+function test(){
+# test
+  docker run \
+    --rm \
+    -v `pwd`:/haya/contracts \
+    -v `pwd`/.ccache:/root/.ccache \
+    -w /haya/contracts \
+    -ti mixbytes/haya:devel \
+    /haya/contracts/build/tests/unit_test
+}
+
+$JOB

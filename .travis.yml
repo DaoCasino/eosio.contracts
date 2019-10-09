@@ -9,6 +9,17 @@ jobs:
   include:
     - stage: build
       script:
-        - set -e
-        - docker build -t haya:contracts .
-        - docker run haya:contracts /haya/contracts/build/tests/unit_test
+        - ./cicd/run build
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "W7eEQBjQey098auzprA8RZfeSmA8r/Aq8mgqDPE1quzMiAZ2q/dyMI9t4b4aZ58bMeIHyu4sr4Qdcmxq3sDUBnE9G85Ju8s7tjverQabdr9SR0F0QILQxleUWMdvi0n+933M/O0qM5jdgPrPzsKuch0kHAZCFypX6/fsGvRpyrGTvRLhDZhSHcV84mgdcwG0/D9kDDAkazN/ASb8uR6yh0NrXNTM42MiHT6lpGvIl5fxDgGAnpE0s25h+fPExQD/R+9XKxjrzYbAxA2b0PXEtRWiOErnZ1Ynqyr/06nqprrVRRDCgETGAzgIbaF7qL4sDTGI4YKO/H2Q9Xd7s4l3zSFml/CyQreHg6/vXdQdn1ZIpuT7G57y28VXcMArBtiwHn9iCJRLY+5l2lvXAdYvZnDgKnM4Lg5oScN3uTodDsERysZew8w2GP+QDsothgGJiPjla8A8LT/CC/4maIqVHWGxqeyCd6jjTqBoEs0JDcXbBkAa8uQU6KWibDDCraOc91LVnCHUlC+KCMQ0+0d4CvtXuPfJVjG3qnv3sR++GByJQNnLgkI4IPP1VykhKtgGvgiCIC7rVujB+OnIUuZBqyGf5zrOizu/coX2Y1BvlAMqKJZags77M/IqTDxCvtL71WrW3D6FW2GQbeblR2T9nDDc4K+0HE5XQUnEdJOAVhE="
+  file_glob: true
+  file: build/assets/*
+  skip_cleanup: true
+  draft: true
+  overwrite: true
+  on:
+    tags: true
+
