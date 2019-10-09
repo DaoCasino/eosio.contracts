@@ -10,6 +10,7 @@
 #include <eosiolib/privileged.hpp>
 #include <eosiolib/singleton.hpp>
 #include <eosio.system/exchange_state.hpp>
+#include <eosio.system/contracts.version.hpp>
 
 #include <string>
 #include <deque>
@@ -103,7 +104,7 @@ namespace eosiosystem {
                                 (last_producer_schedule_update)(last_pervote_bucket_fill)
                                 (pervote_bucket)(perblock_bucket)(total_unpaid_blocks)(total_activated_stake)(active_stake)(thresh_activated_stake_time)
                                 (target_producer_schedule_size)(last_producer_schedule_size)(total_producer_vote_weight)(last_name_close)
-                                (last_target_schedule_size_update)(schedule_update_interval)(schedule_size_step))
+                                (last_target_schedule_size_update)(schedule_update_interval)(schedule_size_step) )
    };
 
    /**
@@ -198,6 +199,13 @@ namespace eosiosystem {
       EOSLIB_SERIALIZE( voter_info, (owner)(proxy)(producers)(staked)(last_vote_weight)(proxied_vote_weight)(is_proxy)(flags1)(reserved2)(reserved3) )
    };
 
+
+   struct [[eosio::table("version"), eosio::contract("eosio.system")]] version_info {
+      std::string version = CONTRACTS_VERSION;
+      EOSLIB_SERIALIZE( version_info, (version) ) 
+   };
+   
+
    typedef eosio::multi_index< "voters"_n, voter_info >  voters_table;
 
 
@@ -209,6 +217,7 @@ namespace eosiosystem {
    typedef eosio::singleton< "global"_n, eosio_global_state >   global_state_singleton;
    typedef eosio::singleton< "global2"_n, eosio_global_state2 > global_state2_singleton;
    typedef eosio::singleton< "global3"_n, eosio_global_state3 > global_state3_singleton;
+   typedef eosio::singleton< "version"_n, version_info >        contracts_version_singleton;
 
    static constexpr uint32_t     seconds_per_day = 24 * 3600;
 
@@ -225,6 +234,7 @@ namespace eosiosystem {
          eosio_global_state2     _gstate2;
          eosio_global_state3     _gstate3;
          rammarket               _rammarket;
+         contracts_version_singleton _contracts_version;
 
       public:
          static constexpr eosio::name active_permission{"active"_n};
