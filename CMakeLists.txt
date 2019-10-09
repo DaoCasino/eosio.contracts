@@ -1,16 +1,19 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(eosio_contracts)
+set(PROJECT "eosio_contracts")
+project(${PROJECT})
 
 execute_process(COMMAND git describe --tags
-	OUTPUT_VARIABLE GIT_TAG
+	OUTPUT_VARIABLE GIT_TAG_RAW
                 ERROR_QUIET)
-string(SUBSTRING "${GIT_TAG}" 1 5 VER_FULL)
-message(STATUS "${PROJECT} version: ${VER_FULL}")
-string(REPLACE "." ";" VER_LIST ${VER_FULL})
+string(STRIP ${GIT_TAG_RAW} GIT_TAG)
+string(REGEX REPLACE "^v" "" SEMVER_FULL ${GIT_TAG})
+string(REPLACE "." ";" VER_LIST ${SEMVER_FULL})
 list(GET VER_LIST 0 VER_MAJOR)
 list(GET VER_LIST 1 VER_MINOR)
 list(GET VER_LIST 2 VER_PATCH)
+
+message(STATUS "${PROJECT} version: ${SEMVER_FULL} (semver), ${GIT_TAG} (git)")
 
 set(VERSION_MAJOR ${VER_MAJOR})
 set(VERSION_MINOR ${VER_MINOR})
@@ -97,6 +100,6 @@ ExternalProject_Add(
 
 add_custom_target(create_tar ALL COMMAND
   mkdir -p assets &&
-	tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*' -f "assets/contracts-${VERSION_FULL}.tar.gz" "contracts" --transform='s/contracts/contracts-${VERSION_FULL}/g'
+	tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='include' --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*' -f "assets/contracts-${GIT_TAG}.tar.gz" "contracts" --transform='s/contracts/contracts-${GIT_TAG}/g'
 	)
 add_dependencies(create_tar contracts_unit_tests)
