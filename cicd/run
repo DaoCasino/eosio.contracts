@@ -8,10 +8,19 @@ function build(){
   docker run \
     --rm \
     -v `pwd`:/haya/contracts \
-    -v `pwd`/.ccache:/root/.ccache \
     -w /haya/contracts \
     -ti mixbytes/haya:devel \
     ./cicd/build.sh
+}
+
+# pack
+function pack(){
+  docker run \
+    --rm \
+    -v `pwd`:/haya/contracts \
+    -w /haya/contracts \
+    -ti mixbytes/haya:devel \
+    ./cicd/pack.sh
 }
 
 function test(){
@@ -19,7 +28,6 @@ function test(){
   docker run \
     --rm \
     -v `pwd`:/haya/contracts \
-    -v `pwd`/.ccache:/root/.ccache \
     -w /haya/contracts \
     -ti mixbytes/haya:devel \
     /haya/contracts/build/tests/unit_test

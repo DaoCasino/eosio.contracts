@@ -1,7 +1,35 @@
 cmake_minimum_required(VERSION 3.5)
 
+set(CMAKE_MODULE_PATH "/opt/eosio/lib/cmake/haya")
+set(CMAKE_BUILD_PARALLEL_LEVEL 12)
+
 set(PROJECT "eosio_contracts")
+
 project(${PROJECT})
+
+# Check equal CMAKE_SOURCE_DIR and CMAKE_BINARY_DIR
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
+  set(dir "build")
+  set(cmd "cmake")
+  if (target)
+    set(dir "${dir}/${target}")
+    set(cmd "${cmd} -Dtarget=${target}")
+  elseif(CMAKE_BUILD_TYPE)
+    set(dir "${dir}/${CMAKE_BUILD_TYPE}")
+    set(cmd "${cmd} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+  else()
+    set(dir "${dir}/default")
+  endif()
+  set(cmd "${cmd} ${CMAKE_SOURCE_DIR}")
+
+  message(FATAL_ERROR "Builds are not allowed in ${CMAKE_SOURCE_DIR}.\n"
+    "Instead:\n"
+    "1) Remove the CMakeCache.txt file and CMakeFiles directory "
+   "from ${CMAKE_SOURCE_DIR}.\n"
+    "2) Create a directory to hold your build files, for example: ${dir}.\n"
+    "3) Change to that directory.\n"
+    "4) Run cmake targetting ${CMAKE_SOURCE_DIR}, for example: ${cmd}")
+endif()
 
 execute_process(COMMAND git describe --tags
 	OUTPUT_VARIABLE GIT_TAG_RAW
@@ -97,8 +125,9 @@ ExternalProject_Add(
   TEST_COMMAND   ""
   INSTALL_COMMAND ""
 )
+add_dependencies(contracts_unit_tests contracts_project)
 
-add_custom_target(create_tar ALL COMMAND
+add_custom_target(create_tar COMMAND
   mkdir -p assets &&
 	tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='include' --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*' -f "assets/contracts-${GIT_TAG}.tar.gz" "contracts" --transform='s/contracts/contracts-${GIT_TAG}/g'
 	)
