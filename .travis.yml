@@ -10,6 +10,7 @@ jobs:
     - stage: build
       script:
         - ./cicd/run build
+        - ./cicd/run pack
 
 deploy:
   provider: releases

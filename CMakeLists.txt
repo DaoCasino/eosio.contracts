@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(CMAKE_MODULE_PATH "/opt/eosio/lib/cmake/haya")
-set(CMAKE_BUILD_PARALLEL_LEVEL 12)
-
 set(PROJECT "eosio_contracts")
 
 project(${PROJECT})
