@@ -9,7 +9,7 @@ function build(){
     --rm \
     -v `pwd`:/haya/contracts \
     -w /haya/contracts \
-    -ti mixbytes/haya:devel \
+    -ti mixbytes/haya:devel-patched-cdt \
     ./cicd/build.sh
 }
 
@@ -19,8 +19,18 @@ function pack(){
     --rm \
     -v `pwd`:/haya/contracts \
     -w /haya/contracts \
-    -ti mixbytes/haya:devel \
+    -ti mixbytes/haya:devel-patched-cdt \
     ./cicd/pack.sh
+}
+
+# login
+function login(){
+  docker run \
+    --rm \
+    -v `pwd`:/haya/contracts \
+    -w /haya/contracts \
+    -ti mixbytes/haya:devel-patched-cdt \
+    bash
 }
 
 function test(){
@@ -29,7 +39,7 @@ function test(){
     --rm \
     -v `pwd`:/haya/contracts \
     -w /haya/contracts \
-    -ti mixbytes/haya:devel \
+    -ti mixbytes/haya:devel-patched-cdt \
     /haya/contracts/build/tests/unit_test
 }
 
