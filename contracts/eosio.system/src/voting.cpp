@@ -232,7 +232,7 @@ namespace eosiosystem {
          check( producers.size() == 0, "cannot vote for producers and proxy at same time" );
          check( voter_name != proxy, "cannot proxy to self" );
       } else {
-         check( producers.size() <= 100, "attempt to vote for too many producers" );
+         check( producers.size() == 1, "attempt to vote for too many producers" );
          for( size_t i = 1; i < producers.size(); ++i ) {
             check( producers[i-1] < producers[i], "producer votes must be unique and sorted" );
          }
