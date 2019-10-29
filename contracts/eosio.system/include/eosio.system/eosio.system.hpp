@@ -220,6 +220,7 @@ namespace eosiosystem {
    typedef eosio::singleton< "version"_n, version_info >        contracts_version_singleton;
 
    static constexpr uint32_t     seconds_per_day = 24 * 3600;
+   static const double           min_producer_activated_share = 0;
 
    class [[eosio::contract("eosio.system")]] system_contract : public native {
 

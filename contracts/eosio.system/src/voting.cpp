@@ -124,7 +124,7 @@ namespace eosiosystem {
             continue;
          }
          auto total_staked = itr->net_weight + itr->cpu_weight + itr->vote_weight;
-         if (total_staked.amount >= 0.001 * token_supply.amount) {
+         if (total_staked.amount >= min_producer_activated_share * token_supply.amount) {
             top_producers.emplace_back( std::pair<eosio::producer_key,uint16_t>({{it->owner, it->producer_key}, it->location}) );
          }
       }
