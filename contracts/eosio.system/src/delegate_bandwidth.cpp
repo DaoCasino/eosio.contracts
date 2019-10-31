@@ -238,9 +238,17 @@ namespace eosiosystem {
    {
       require_auth( from );
       check( stake_net_delta.amount != 0 || stake_cpu_delta.amount != 0 || stake_vote_delta.amount != 0, "should stake non-zero amount" );
-      check( std::abs( (stake_net_delta + stake_cpu_delta).amount )
-             >= std::max( std::abs( stake_net_delta.amount ), std::abs( stake_cpu_delta.amount ) ),
-             "net and cpu deltas cannot be opposite signs" );
+      auto get_asset_sign = [](const asset& delta) {
+         if (delta.amount > 0) {
+            return 1;
+         } else if (delta.amount == 0) {
+            return 0;
+         }
+         return -1;
+      };
+
+      check( get_asset_sign(stake_net_delta) == get_asset_sign(stake_cpu_delta) && get_asset_sign(stake_cpu_delta) == get_asset_sign(stake_vote_delta),
+         "net, cpu and vote deltas should have same signs");
 
       name source_stake_from = from;
       if ( transfer ) {
@@ -296,7 +304,7 @@ namespace eosiosystem {
          }
          check( 0 <= tot_itr->net_weight.amount, "insufficient staked total net bandwidth" );
          check( 0 <= tot_itr->cpu_weight.amount, "insufficient staked total cpu bandwidth" );
-         check( 0 <= tot_itr->vote_weight.amount, "insufficient staked total cpu bandwidth" );
+         check( 0 <= tot_itr->vote_weight.amount, "insufficient staked total  vote bandwidth" );
 
          {
             bool ram_managed = false;
@@ -340,13 +348,13 @@ namespace eosiosystem {
 
          // net and cpu are same sign by assertions in delegatebw and undelegatebw
          // redundant assertion also at start of changebw to protect against misuse of changebw
-         bool is_undelegating = (net_balance.amount + cpu_balance.amount ) < 0;
+         bool is_undelegating = (net_balance.amount + cpu_balance.amount + vote_balance.amount) < 0;
          bool is_delegating_to_self = (!transfer && from == receiver);
 
          if( is_delegating_to_self || is_undelegating ) {
             if ( req != refunds_tbl.end() ) { //need to update refund
                refunds_tbl.modify( req, same_payer, [&]( refund_request& r ) {
-                  if ( net_balance.amount < 0 || cpu_balance.amount < 0 ) {
+                  if ( net_balance.amount < 0 || cpu_balance.amount < 0 || vote_balance.amount < 0) {
                      r.request_time = current_time_point();
                   }
                   r.net_amount -= net_balance;
