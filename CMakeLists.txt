@@ -21,114 +21,101 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
   message(FATAL_ERROR "Builds are not allowed in ${CMAKE_SOURCE_DIR}.\n"
     "Instead:\n"
-    "1) Remove the CMakeCache.txt file and CMakeFiles directory "
-   "from ${CMAKE_SOURCE_DIR}.\n"
+    "1) Remove the CMakeCache.txt file and CMakeFiles directory from ${CMAKE_SOURCE_DIR}.\n"
     "2) Create a directory to hold your build files, for example: ${dir}.\n"
     "3) Change to that directory.\n"
     "4) Run cmake targetting ${CMAKE_SOURCE_DIR}, for example: ${cmd}")
 endif()
 
-execute_process(COMMAND git describe --tags
-	OUTPUT_VARIABLE GIT_TAG_RAW
-                ERROR_QUIET)
-string(STRIP ${GIT_TAG_RAW} GIT_TAG)
-string(REGEX REPLACE "^v" "" SEMVER_TMP_1 ${GIT_TAG})
-string(REPLACE "." ";" SEMVER_TMP_LIST ${SEMVER_TMP_1})
-list(GET SEMVER_TMP_LIST 0 SEMVER_MAJOR) # SEMVER_MAJOR.X.X
-list(GET SEMVER_TMP_LIST 1 SEMVER_MINOR) # SEMVER_MAJOR.SEMVER_MINOR.X
-list(GET SEMVER_TMP_LIST 2 SEMVER_TMP_PATCH)
-string(REPLACE "-" ";" SEMVER_TMP_PATCH_LIST ${SEMVER_TMP_PATCH})
-list(GET SEMVER_TMP_PATCH_LIST 0 SEMVER_PATCH) # SEMVER_MAJOR.SEMVER_MINOR.SEMVER_PATCH
-set(SEMVER_FULL "${SEMVER_MAJOR}.${SEMVER_MINOR}.${SEMVER_PATCH}")
+include(daobet-utils) # from daobet/CMakeModules
 
-message(STATUS "${PROJECT} version: ${SEMVER_FULL} (semver), ${GIT_TAG} (git)")
-
-set(VERSION_MAJOR ${VER_MAJOR})
-set(VERSION_MINOR ${VER_MINOR})
-set(VERSION_PATCH ${VER_PATCH})
-#set(VERSION_SUFFIX rc3)
-
-if (VERSION_SUFFIX)
-   set(VERSION_FULL "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}-${VERSION_SUFFIX}")
-else()
-   set(VERSION_FULL "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-endif()
+get_version_from_git(_ CONTRACTS_VER_DIRTY)
+message(STATUS "Building eosio.contracts (version ${CONTRACTS_VER_DIRTY})...")
+#XXX: CONTRACTS_VER_DIRTY used in contracts/eosio.system/include/eosio.system/contracts.version.hpp.in
 
 include(ExternalProject)
-
 find_package(eosio.cdt)
+message(STATUS "Package eosio.cdt found; EOSIO_CDT_ROOT = ${EOSIO_CDT_ROOT}")
 
-message(STATUS "Building eosio.contracts v${VERSION_FULL}")
-
-set(EOSIO_CDT_VERSION_MIN "1.5")
-set(EOSIO_CDT_VERSION_SOFT_MAX "1.5")
-#set(EOSIO_CDT_VERSION_HARD_MAX "")
+set(eosio_cdt_version_hard_min "1.5")
+set(eosio_cdt_version_soft_max "1.5")
+set(eosio_cdt_version_hard_max "")
 
 ### Check the version of eosio.cdt
-set(VERSION_MATCH_ERROR_MSG "")
-EOSIO_CHECK_VERSION(VERSION_OUTPUT "${EOSIO_CDT_VERSION}"
-                                   "${EOSIO_CDT_VERSION_MIN}"
-                                   "${EOSIO_CDT_VERSION_SOFT_MAX}"
-                                   "${EOSIO_CDT_VERSION_HARD_MAX}"
-                                   VERSION_MATCH_ERROR_MSG)
-if(VERSION_OUTPUT STREQUAL "MATCH")
-   message(STATUS "Using eosio.cdt version ${EOSIO_CDT_VERSION}")
-elseif(VERSION_OUTPUT STREQUAL "WARN")
-   message(WARNING "Using eosio.cdt version ${EOSIO_CDT_VERSION} even though it exceeds the maximum supported version of ${EOSIO_CDT_VERSION_SOFT_MAX}; continuing with configuration, however build may fail.\nIt is recommended to use eosio.cdt version ${EOSIO_CDT_VERSION_SOFT_MAX}.x")
+set(version_match_error_msg "")
+EOSIO_CHECK_VERSION(
+  check_status
+  "${EOSIO_CDT_VERSION}"
+  "${eosio_cdt_version_hard_min}"
+  "${eosio_cdt_version_soft_max}"
+  "${eosio_cdt_version_hard_max}"
+  version_match_error_msg
+)
+if(check_status STREQUAL "MATCH")
+  message(STATUS "Using eosio.cdt version ${EOSIO_CDT_VERSION}")
+elseif(check_status STREQUAL "WARN")
+  message(WARNING "Using eosio.cdt version ${EOSIO_CDT_VERSION} even though it exceeds the maximum\n"
+    "supported version of ${eosio_cdt_version_soft_max}; continuing with configuration, however build may fail.\n"
+    "It is recommended to use eosio.cdt version ${eosio_cdt_version_soft_max}.")
 else() # INVALID OR MISMATCH
-   message(FATAL_ERROR "Found eosio.cdt version ${EOSIO_CDT_VERSION} but it does not satisfy version requirements: ${VERSION_MATCH_ERROR_MSG}\nPlease use eosio.cdt version ${EOSIO_CDT_VERSION_SOFT_MAX}.x")
-endif(VERSION_OUTPUT STREQUAL "MATCH")
+  message(FATAL_ERROR "Found eosio.cdt version ${EOSIO_CDT_VERSION} but it does not satisfy version\n"
+    "requirements: ${version_match_error_msg}. Please use eosio.cdt version ${eosio_cdt_version_soft_max}.")
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-   set(TEST_BUILD_TYPE "Debug")
-   set(CMAKE_BUILD_TYPE "Release")
+  set(TEST_BUILD_TYPE "Debug")
+  set(CMAKE_BUILD_TYPE "Release")
 else()
-   set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
+  set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
 endif()
 
 ExternalProject_Add(
-   contracts_project
-   SOURCE_DIR ${CMAKE_SOURCE_DIR}/contracts
-   BINARY_DIR ${CMAKE_BINARY_DIR}/contracts
-   CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${EOSIO_CDT_ROOT}/lib/cmake/eosio.cdt/EosioWasmToolchain.cmake
-   UPDATE_COMMAND ""
-   PATCH_COMMAND ""
-   TEST_COMMAND ""
-   INSTALL_COMMAND ""
-   BUILD_ALWAYS 1
+  contracts_project
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/contracts
+  BINARY_DIR ${CMAKE_BINARY_DIR}/contracts
+  CMAKE_ARGS
+    -DCMAKE_TOOLCHAIN_FILE=${EOSIO_CDT_ROOT}/lib/cmake/eosio.cdt/EosioWasmToolchain.cmake
+    -DCONTRACTS_VER_DIRTY=${CONTRACTS_VER_DIRTY}
+  UPDATE_COMMAND ""
+  PATCH_COMMAND ""
+  TEST_COMMAND ""
+  INSTALL_COMMAND ""
+  BUILD_ALWAYS 1
 )
 
 if (APPLE)
-   set(OPENSSL_ROOT "/usr/local/opt/openssl")
+  set(OPENSSL_ROOT "/usr/local/opt/openssl")
 elseif (UNIX)
-   set(OPENSSL_ROOT "/usr/include/openssl")
+  set(OPENSSL_ROOT "/usr/include/openssl")
 endif()
 set(SECP256K1_ROOT "/usr/local")
 
-if (APPLE)
-   set(OPENSSL_ROOT "/usr/local/opt/openssl")
-elseif (UNIX)
-   set(OPENSSL_ROOT "/usr/include/openssl")
-endif()
-set(SECP256K1_ROOT "/usr/local")
 
 string(REPLACE ";" "|" TEST_FRAMEWORK_PATH "${CMAKE_FRAMEWORK_PATH}")
 string(REPLACE ";" "|" TEST_MODULE_PATH "${CMAKE_MODULE_PATH}")
-
 ExternalProject_Add(
   contracts_unit_tests
   LIST_SEPARATOR | # Use the alternate list separator
-  CMAKE_ARGS -DCMAKE_BUILD_TYPE=${TEST_BUILD_TYPE} -DCMAKE_FRAMEWORK_PATH=${TEST_FRAMEWORK_PATH} -DCMAKE_MODULE_PATH=${TEST_MODULE_PATH} -DEOSIO_ROOT=${EOSIO_ROOT} -DLLVM_DIR=${LLVM_DIR}
+  CMAKE_ARGS
+    -DBOOST_ROOT=${BOOST_ROOT}
+    -DBoost_NO_SYSTEM_PATHS=${Boost_NO_SYSTEM_PATHS}
+    -DCMAKE_BUILD_TYPE=${TEST_BUILD_TYPE}
+    -DCMAKE_FRAMEWORK_PATH=${TEST_FRAMEWORK_PATH}
+    -DCMAKE_MODULE_PATH=${TEST_MODULE_PATH}
+    -DEOSIO_ROOT=${EOSIO_ROOT}
+    -DLLVM_DIR=${LLVM_DIR}
+    -Deosio_DIR=${CMAKE_MODULE_PATH}
   SOURCE_DIR ${CMAKE_SOURCE_DIR}/tests
   BINARY_DIR ${CMAKE_BINARY_DIR}/tests
-  BUILD_ALWAYS 1
-  TEST_COMMAND   ""
+  TEST_COMMAND ""
   INSTALL_COMMAND ""
+  BUILD_ALWAYS 1
 )
 add_dependencies(contracts_unit_tests contracts_project)
 
 add_custom_target(create_tar COMMAND
   mkdir -p assets &&
-	tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='include' --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*' -f "assets/contracts-${GIT_TAG}.tar.gz" "contracts" --transform='s/contracts/contracts-${GIT_TAG}/g'
-	)
+    tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='include' --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*'
+    -f "assets/contracts-${CONTRACTS_VER_DIRTY}.tar.gz" "contracts" --transform='s/contracts/contracts-${CONTRACTS_VER_DIRTY}/g'
+)
 add_dependencies(create_tar contracts_unit_tests)

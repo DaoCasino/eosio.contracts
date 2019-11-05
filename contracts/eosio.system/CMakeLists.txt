@@ -1,7 +1,8 @@
-execute_process(COMMAND git describe --tags --dirty
-                COMMAND tr -d '\n'
-                OUTPUT_VARIABLE CONTRACTS_VERSION)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/eosio.system/contracts.version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/eosio.system/contracts.version.hpp)
+message(STATUS "Setting version ${CONTRACTS_VER_DIRTY} in contracts.version.hpp")
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio.system/contracts.version.hpp.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/eosio.system/contracts.version.hpp
+)
 
 add_contract(eosio.system eosio.system ${CMAKE_CURRENT_SOURCE_DIR}/src/eosio.system.cpp)
 
