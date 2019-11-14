@@ -168,7 +168,7 @@ public:
                                             ("stake_net_quantity", STRSYM("10.0000") )
                                             ("stake_cpu_quantity", STRSYM("10.0000") )
                                             ("stake_vote_quantity", STRSYM("0.0000"))
-                                            ("transfer", 0 )
+                                            ("transfer", false )
                                           )
                                 );
 
@@ -218,7 +218,7 @@ public:
                                             ("stake_net_quantity", net )
                                             ("stake_cpu_quantity", cpu )
                                             ("stake_vote_quantity", vote)
-                                            ("transfer", transfer ? 1 : 0 )
+                                            ("transfer", transfer ? true : false )
                                           )
                                 );
 
@@ -262,7 +262,7 @@ public:
                                                ("stake_net_quantity", net)
                                                ("stake_cpu_quantity", cpu)
                                                ("stake_vote_quantity", vote)
-                                               ("transfer", 1)
+                                               ("transfer", false)
                                                )
                                    );
       }
@@ -309,7 +309,7 @@ public:
                           ("stake_net_quantity", net)
                           ("stake_cpu_quantity", cpu)
                           ("stake_vote_quantity", vote)
-                          ("transfer", 0 )
+                          ("transfer", false )
       );
    }
 
@@ -391,12 +391,12 @@ public:
                          ("producers", producers));
    }
 
-   asset get_balance( const account_name& act, symbol balance_symbol = symbol{CORE_SYM} ) {
+   asset get_balance( const account_name& act, symbol balance_symbol = symbol{CORE_SYM} ) const {
       vector<char> data = get_row_by_account( N(eosio.token), act, N(accounts), balance_symbol.to_symbol_code().value );
       return data.empty() ? asset(0, balance_symbol) : token_abi_ser.binary_to_variant("account", data, abi_serializer_max_time)["balance"].as<asset>();
    }
 
-   fc::variant get_total_stake( const account_name& act ) {
+   fc::variant get_total_stake( const account_name& act ) const {
       vector<char> data = get_row_by_account( config::system_account_name, act, N(userres), act );
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "user_resources", data, abi_serializer_max_time );
    }
@@ -414,6 +414,32 @@ public:
    fc::variant get_producer_info2( const account_name& act ) {
       vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(producers2), act );
       return abi_ser.binary_to_variant( "producer_info2", data, abi_serializer_max_time );
+   }
+
+   fc::variant get_name_bid( const account_name& act ) const {
+      vector<char> data = get_row_by_account( config::system_account_name, act, N(namebids), act );
+      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "name_bid_table", data, abi_serializer_max_time );
+   }
+
+   void debug_name_bids( const std::vector<account_name>& accounts ) const {
+      for (const auto& a : accounts) {
+         std::stringstream bid;
+         bid << get_name_bid(a);
+
+         BOOST_TEST_MESSAGE("name bid for " << a.to_string() << ": " << bid.str());
+      }
+   }
+
+   void debug_balances( const std::vector<account_name>& accounts ) const {
+      for (const auto& a : accounts) {
+         //TODO: WTF "error: no member named 'to_string' in 'fc::variant'"???!!!
+         std::stringstream stake;
+         stake << get_total_stake(a);
+
+         BOOST_TEST_MESSAGE(a.to_string()
+            << ": balance: " << get_balance(a)
+            << ", user_resources: " << stake.str());
+      }
    }
 
    void create_currency( const name& contract, const name& manager, const asset& maxsupply ) {
@@ -582,7 +608,7 @@ public:
                                                ("stake_net_quantity", STRSYM("0.0000") )
                                                ("stake_cpu_quantity", STRSYM("0.0000") )
                                                ("stake_vote_quantity", STRSYM("25090625.0000"))
-                                               ("transfer", 1 )
+                                               ("transfer", true )
                                              )
                                  );
          trx.actions.emplace_back( get_action( config::system_account_name, N(voteproducer),

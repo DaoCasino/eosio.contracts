@@ -12,6 +12,8 @@
 
 #include "eosio.system_tester.hpp"
 
+//XXX: run tests with --log_level=message (or below) to see BOOST_TEST_MESSAGE output
+
 struct _abi_hash {
    name owner;
    fc::sha256 hash;
@@ -27,7 +29,7 @@ BOOST_FIXTURE_TEST_CASE( buysell, eosio_system_tester ) try {
    BOOST_REQUIRE_EQUAL( STRSYM("0.0000"), get_balance( "alice1111111" ) );
 
    transfer( "eosio", "alice1111111", STRSYM("1000.0000"), "eosio" );
-   BOOST_REQUIRE_EQUAL( success(), stake( "eosio", "alice1111111", STRSYM("200.0000"), STRSYM("100.0000"), STRSYM("100.0000") ) );
+   BOOST_REQUIRE_EQUAL( success(), stake( "eosio", "alice1111111", STRSYM("200.0000"), STRSYM("100.0000"), STRSYM("0.0000") ) );
 
    auto total = get_total_stake( "alice1111111" );
    auto init_bytes =  total["ram_bytes"].as_uint64();
@@ -2695,7 +2697,6 @@ BOOST_FIXTURE_TEST_CASE( elect_producers /*_and_parameters*/, eosio_system_teste
 
 } FC_LOG_AND_RETHROW()
 
-
 BOOST_FIXTURE_TEST_CASE( buyname, eosio_system_tester ) try {
    create_accounts_with_resources( { N(dan), N(sam) } );
    transfer( config::system_account_name, "dan", STRSYM( "10000.0000" ) );
@@ -2706,32 +2707,44 @@ BOOST_FIXTURE_TEST_CASE( buyname, eosio_system_tester ) try {
    regproducer( config::system_account_name );
    BOOST_REQUIRE_EQUAL( success(), vote( N(sam), { config::system_account_name } ) );
    // wait 14 days after min required amount has been staked
-   produce_block( fc::days(7) );
-   BOOST_REQUIRE_EQUAL( success(), vote( N(dan), { config::system_account_name } ) );
-   produce_block( fc::days(7) );
+   produce_block(fc::days(7));
+   BOOST_REQUIRE_EQUAL( success(), vote(N(dan), { config::system_account_name }) );
+   produce_block(fc::days(7));
    produce_block();
 
-   BOOST_REQUIRE_EXCEPTION( create_accounts_with_resources( { N(fail) }, N(dan) ), // dan shouldn't be able to create fail
-                            eosio_assert_message_exception, eosio_assert_message_is( "no active bid for name" ) );
-   bidname( "dan", "nofail", core_sym::from_string( "1.0000" ) );
-   BOOST_REQUIRE_EQUAL( "assertion failure with message: must increase bid by 10%", bidname( "sam", "nofail", core_sym::from_string( "1.0000" ) )); // didn't increase bid by 10%
-   BOOST_REQUIRE_EQUAL( success(), bidname( "sam", "nofail", core_sym::from_string( "2.0000" ) )); // didn't increase bid by 10%
-   produce_block( fc::days(1) );
+   BOOST_REQUIRE_EXCEPTION( create_accounts_with_resources({ N(fail) }, N(dan)), // dan shouldn't be able to create fail
+                            eosio_assert_message_exception, eosio_assert_message_is("no active bid for name") );
+   const auto log = bidname("dan", "nofail", STRSYM("1.0000"));
+   BOOST_TEST_MESSAGE( "bidname(): " << log );
+   debug_name_bids({ N(eosio), N(sam), N(dan), N(nofail) });
+
+   // didn't increase bid by 10%
+   BOOST_REQUIRE_EQUAL( "assertion failure with message: must increase bid by 10%", bidname("sam", "nofail", STRSYM("1.0000")) );
+   debug_name_bids({ N(eosio), N(sam), N(dan), N(nofail) });
+
+   BOOST_REQUIRE_EQUAL( success(), bidname("sam", "nofail", STRSYM("2.0000")) );
+   debug_name_bids({ N(eosio), N(sam), N(dan), N(nofail) });
+
+   produce_block(fc::days(1));
    produce_block();
+   debug_name_bids({ N(eosio), N(sam), N(dan), N(nofail) });
 
-   BOOST_REQUIRE_EXCEPTION( create_accounts_with_resources( { N(nofail) }, N(dan) ), // dan shoudn't be able to do this, sam won
-                            eosio_assert_message_exception, eosio_assert_message_is( "only highest bidder can claim" ) );
-   //wlog( "verify sam can create nofail" );
-   create_accounts_with_resources( { N(nofail) }, N(sam) ); // sam should be able to do this, he won the bid
-   //wlog( "verify nofail can create test.nofail" );
-   transfer( "eosio", "nofail", core_sym::from_string( "1000.0000" ) );
-   create_accounts_with_resources( { N(test.nofail) }, N(nofail) ); // only nofail can create test.nofail
-   //wlog( "verify dan cannot create test.fail" );
-   BOOST_REQUIRE_EXCEPTION( create_accounts_with_resources( { N(test.fail) }, N(dan) ), // dan shouldn't be able to do this
-                            eosio_assert_message_exception, eosio_assert_message_is( "only suffix may create this account" ) );
+   BOOST_REQUIRE_EXCEPTION( create_account_with_resources(N(nofail), N(dan)), // dan shoudn't be able to do this, sam won
+                            eosio_assert_message_exception, eosio_assert_message_is("only highest bidder can claim") );
+   //wlog("verify sam can create nofail");
+   debug_balances({N(sam), N(dan), N(nofail)});
 
-   create_accounts_with_resources( { N(goodgoodgood) }, N(dan) ); /// 12 char names should succeed
+   create_account_with_resources(N(nofail), N(sam)); // sam should be able to do this, he won the bid
+   //wlog("verify nofail can create test.nofail");
+   transfer("eosio", "nofail", STRSYM("1000.0000"));
+   create_account_with_resources( N(test.nofail), N(nofail) ); // only nofail can create test.nofail
+   //wlog("verify dan cannot create test.fail");
+   BOOST_REQUIRE_EXCEPTION( create_account_with_resources(N(test.fail), N(dan)), // dan shouldn't be able to do this
+                            eosio_assert_message_exception, eosio_assert_message_is("only suffix may create this account") );
+
+   create_account_with_resources(N(goodgoodgood), N(dan)); /// 12 char names should succeed
 } FC_LOG_AND_RETHROW()
+
 
 BOOST_FIXTURE_TEST_CASE( bid_invalid_names, eosio_system_tester ) try {
    create_accounts_with_resources( { N(dan) } );
@@ -2747,11 +2760,9 @@ BOOST_FIXTURE_TEST_CASE( bid_invalid_names, eosio_system_tester ) try {
 
    BOOST_REQUIRE_EQUAL( wasm_assert_msg( "accounts with 12 character names and no dots can be created without bidding required" ),
                         bidname( "dan", "abcdefg12345", STRSYM( "1.0000" ) ) );
-
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( multiple_namebids, eosio_system_tester ) try {
-
    const std::string not_closed_message("auction for name is not closed yet");
 
    std::vector<account_name> accounts = { N(alice), N(bob), N(carl), N(david), N(eve) };
@@ -3387,39 +3398,51 @@ BOOST_FIXTURE_TEST_CASE( buy_pin_sell_ram, eosio_system_tester ) try {
 
    transfer( N(eosio), N(alice1111111), STRSYM("1020.0000") );
 
-   auto error_msg = stake( N(alice1111111), N(eosio), STRSYM("10.0000"), STRSYM("10.0000"), STRSYM("1.0000") );
+   auto error_msg = stake( N(alice1111111), N(eosio), STRSYM("10.0000"), STRSYM("10.0000"), STRSYM("0.0000") );
    auto semicolon_pos = error_msg.find(';');
 
    BOOST_REQUIRE_EQUAL( error("account eosio has insufficient ram"),
                         error_msg.substr(0, semicolon_pos) );
 
+   // read first number from "account eosio has insufficient ram; needs 1744459 bytes has 1400 bytes"
    int64_t ram_bytes_needed = 0;
    {
       std::istringstream s( error_msg );
-      s.seekg( semicolon_pos + 7, std::ios_base::beg );
+      s.seekg( semicolon_pos + 8, std::ios_base::beg );
       s >> ram_bytes_needed;
       ram_bytes_needed += ram_bytes_needed/10; // enough buffer to make up for buyrambytes estimation errors
+      ram_bytes_needed *= 10;
    }
+   BOOST_TEST_MESSAGE("RAM bytes needed = " << ram_bytes_needed);
 
    auto alice_original_balance = get_balance( N(alice1111111) );
 
    BOOST_REQUIRE_EQUAL( success(), buyrambytes( N(alice1111111), N(eosio), static_cast<uint32_t>(ram_bytes_needed) ) );
 
-   auto tokens_paid_for_ram = alice_original_balance - get_balance( N(alice1111111) );
+   auto alice_new_balance = get_balance( N(alice1111111) );
+   auto tokens_paid_for_ram = alice_original_balance - alice_new_balance;
+
+   BOOST_TEST_MESSAGE("alice: original balance = " << alice_original_balance
+      << ", new balance = " << alice_new_balance
+      << ", tokens paid for ram = " << tokens_paid_for_ram);
 
    auto total_res = get_total_stake( "eosio" );
 
+   BOOST_TEST_MESSAGE("eosio total ram stake = " << total_res["ram_bytes"].as_int64());
+   //std::cerr << get_global_state() << '\n';
+
    REQUIRE_MATCHING_OBJECT( total_res, mvo()
-      ("owner", "eosio")
-      ("net_weight", STRSYM("0.0000"))
-      ("cpu_weight", STRSYM("0.0000"))
-      ("ram_bytes",  total_res["ram_bytes"].as_int64() )
+      ("owner",       "eosio")
+      ("net_weight",  STRSYM("0.0000"))
+      ("cpu_weight",  STRSYM("0.0000"))
+      ("vote_weight", STRSYM("0.0000"))
+      ("ram_bytes",   total_res["ram_bytes"].as_int64() )
    );
 
    BOOST_REQUIRE_EQUAL( wasm_assert_msg( "only supports unlimited accounts" ),
                         push_action( N(eosio), N(setalimits), mvo()
-                                          ("account", "eosio")
-                                          ("ram_bytes", ram_bytes_needed)
+                                          ("account",    "eosio")
+                                          ("ram_bytes",  ram_bytes_needed)
                                           ("net_weight", -1)
                                           ("cpu_weight", -1)
                         )
@@ -3436,9 +3459,19 @@ BOOST_FIXTURE_TEST_CASE( buy_pin_sell_ram, eosio_system_tester ) try {
 
    BOOST_REQUIRE_EQUAL( success(), sellram( N(eosio), total_res["ram_bytes"].as_int64() ) );
 
-   auto tokens_received_by_selling_ram = get_balance( N(eosio) ) - eosio_original_balance;
+   auto eosio_new_balance = get_balance( N(eosio) );
+   auto tokens_received_by_selling_ram = eosio_new_balance - eosio_original_balance;
 
-   BOOST_REQUIRE( double(tokens_paid_for_ram.get_amount() - tokens_received_by_selling_ram.get_amount()) / tokens_paid_for_ram.get_amount() < 0.01 );
+   BOOST_TEST_MESSAGE("eosio: original balance = " << eosio_original_balance
+      << ", new balance = " << eosio_new_balance
+      << ", tokens received for ram = " << tokens_received_by_selling_ram);
+
+   double sell_fee_percentage =
+      double(tokens_paid_for_ram.get_amount() - tokens_received_by_selling_ram.get_amount()) / tokens_paid_for_ram.get_amount();
+
+   BOOST_TEST_MESSAGE("sell_fee_percentage = " << sell_fee_percentage);
+
+   BOOST_REQUIRE( sell_fee_percentage < 0.012 ); // including some rounding errors
 
 } FC_LOG_AND_RETHROW()
 
