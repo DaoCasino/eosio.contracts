@@ -1405,13 +1405,7 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
 
    const asset net = STRSYM("80.0000");
    const asset cpu = STRSYM("80.0000");
-/*   const std::vector<account_name> voters = { N(producvotera), N(producvoterb), N(producvoterc), N(producvoterd) };
-   for (const auto& v: voters) {
-      create_account_with_resources( v, config::system_account_name, STRSYM("1.0000"), false, net, cpu );
-      transfer( config::system_account_name, v, STRSYM("10000000.0000"), config::system_account_name );
-      BOOST_REQUIRE_EQUAL(success(), stake(v, STRSYM("4000000.0000"), STRSYM("4000000.0000"), STRSYM("10.0000")) );
-   }
-*/
+
    // create accounts {defproducera, defproducerb, ..., defproducerz, abcproducera, ..., defproducern} and register as producers
    std::vector<account_name> producer_names;
    std::vector<account_name> voter_names;
