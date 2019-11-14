@@ -1405,27 +1405,33 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
 
    const asset net = STRSYM("80.0000");
    const asset cpu = STRSYM("80.0000");
-   const std::vector<account_name> voters = { N(producvotera), N(producvoterb), N(producvoterc), N(producvoterd) };
+/*   const std::vector<account_name> voters = { N(producvotera), N(producvoterb), N(producvoterc), N(producvoterd) };
    for (const auto& v: voters) {
       create_account_with_resources( v, config::system_account_name, STRSYM("1.0000"), false, net, cpu );
       transfer( config::system_account_name, v, STRSYM("10000000.0000"), config::system_account_name );
       BOOST_REQUIRE_EQUAL(success(), stake(v, STRSYM("4000000.0000"), STRSYM("4000000.0000"), STRSYM("10.0000")) );
    }
-
+*/
    // create accounts {defproducera, defproducerb, ..., defproducerz, abcproducera, ..., defproducern} and register as producers
    std::vector<account_name> producer_names;
+   std::vector<account_name> voter_names;
    {
       producer_names.reserve('z' - 'a' + 1);
+      voter_names.reserve('z' - 'a' + 1);
       {
          const std::string root("defproducer");
+         const std::string voter_root("producvoter");
          for ( char c = 'a'; c <= 'z'; ++c ) {
             producer_names.emplace_back(root + std::string(1, c));
+            voter_names.emplace_back(voter_root + std::string(1, c));
          }
       }
       {
          const std::string root("abcproducer");
+         const std::string voter_root("absvoteracc");
          for ( char c = 'a'; c <= 'n'; ++c ) {
             producer_names.emplace_back(root + std::string(1, c));
+            voter_names.emplace_back(voter_root + std::string(1, c));
          }
       }
       setup_producer_accounts(producer_names);
@@ -1438,17 +1444,44 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
       }
    }
 
+   for (auto i = 0; i < 10; ++i) {
+      auto v = voter_names[i];
+      create_account_with_resources( v, config::system_account_name, STRSYM("1.0000"), false, net, cpu );
+      transfer( config::system_account_name, v, STRSYM("3000000.0000"), config::system_account_name );
+      BOOST_REQUIRE_EQUAL(success(), stake(v, STRSYM("0.0000"), STRSYM("0.0000"), STRSYM("3000000.0000")) );
+   }
+   for (auto i = 10; i < 21; ++i) {
+      auto v = voter_names[i];
+      create_account_with_resources( v, config::system_account_name, STRSYM("1.0000"), false, net, cpu );
+      transfer( config::system_account_name, v, STRSYM("2000000.0000"), config::system_account_name );
+      BOOST_REQUIRE_EQUAL(success(), stake(v, STRSYM("0.0000"), STRSYM("0.0000"), STRSYM("2000000.0000")) );
+   }
+   for (auto i = 21; i < 26; ++i) {
+      auto v = voter_names[i];
+      create_account_with_resources( v, config::system_account_name, STRSYM("1.0000"), false, net, cpu );
+      transfer( config::system_account_name, v, STRSYM("1000000.0000"), config::system_account_name );
+      BOOST_REQUIRE_EQUAL(success(), stake(v, STRSYM("0.0000"), STRSYM("0.0000"), STRSYM("1000000.0000")) );
+   }
+   for (auto i = 26; i < voter_names.size(); ++i) {
+      auto v = voter_names[i];
+      create_account_with_resources( v, config::system_account_name, STRSYM("1.0000"), false, net, cpu );
+      transfer( config::system_account_name, v, STRSYM("1000000.0000"), config::system_account_name );
+      BOOST_REQUIRE_EQUAL(success(), stake(v, STRSYM("0.0000"), STRSYM("0.0000"), STRSYM("1000000.0000")) );
+   }
+
    produce_block( fc::hours(24) );
 
-   // producvotera votes for defproducera ... defproducerj
-   // producvoterb votes for defproducera ... defproduceru
-   // producvoterc votes for defproducera ... defproducerz
-   // producvoterd votes for abcproducera ... abcproducern
-   {
-      BOOST_REQUIRE_EQUAL(success(), vote(N(producvotera), vector<account_name>(producer_names.begin(), producer_names.begin()+10)));
-      BOOST_REQUIRE_EQUAL(success(), vote(N(producvoterb), vector<account_name>(producer_names.begin(), producer_names.begin()+21)));
-      BOOST_REQUIRE_EQUAL(success(), vote(N(producvoterc), vector<account_name>(producer_names.begin(), producer_names.begin()+26)));
-      BOOST_REQUIRE_EQUAL(success(), vote(N(producvoterd), vector<account_name>(producer_names.begin()+26, producer_names.end())));
+   for (auto i = 0; i < 10; ++i) {
+      BOOST_REQUIRE_EQUAL(success(), vote(voter_names[i], { producer_names[i] }));
+   }
+   for (auto i = 10; i < 21; ++i) {
+      BOOST_REQUIRE_EQUAL(success(), vote(voter_names[i], { producer_names[i] }));
+   }
+   for (auto i = 21; i < 26; ++i) {
+      BOOST_REQUIRE_EQUAL(success(), vote(voter_names[i], { producer_names[i] }));
+   }
+   for (auto i = 26; i < producer_names.size(); ++i) {
+      BOOST_REQUIRE_EQUAL(success(), vote(voter_names[i], { producer_names[i] }));
    }
 
    {
@@ -1472,11 +1505,12 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
 
    // give a chance for everyone to produce blocks
    {
-      produce_blocks(23 * 12 + 20);
+      produce_blocks(23 * 12 + 2000);
       bool all_21_produced = true;
       for (uint32_t i = 0; i < 21; ++i) {
          if (0 == get_producer_info(producer_names[i])["unpaid_blocks"].as<uint32_t>()) {
             all_21_produced = false;
+            std::cout << producer_names[i] << "\n";
          }
       }
       bool rest_didnt_produce = true;
@@ -1619,6 +1653,7 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
 
    produce_block(fc::hours(24));
 
+/* Disabled because we use only revision = 0
    // switch to new producer pay metric
    {
       BOOST_REQUIRE_EQUAL( 0, get_global_state2()["revision"].as<uint8_t>() );
@@ -1698,6 +1733,7 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
       BOOST_REQUIRE_EQUAL( wasm_assert_msg("already claimed rewards within past day"),
                            push_action(prod_name, N(claimrewards), mvo()("owner", prod_name) ) );
    }
+*/
 
 } FC_LOG_AND_RETHROW()
 
