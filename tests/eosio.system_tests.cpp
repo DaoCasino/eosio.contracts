@@ -1,16 +1,20 @@
-#include <boost/test/unit_test.hpp>
+#include "eosio.system_tester.hpp"
+
 #include <eosio/chain/contract_table_objects.hpp>
+#include <eosio/chain/exceptions.hpp>
 #include <eosio/chain/global_property_object.hpp>
 #include <eosio/chain/resource_limits.hpp>
 #include <eosio/chain/wast_to_wasm.hpp>
+#include <fc/log/logger.hpp>
+#include <wasm-jit/Runtime/Runtime.h>
+
+#include <boost/algorithm/string/join.hpp>
+#include <boost/range/adaptor/transformed.hpp>
+#include <boost/test/unit_test.hpp>
+
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
-#include <fc/log/logger.hpp>
-#include <eosio/chain/exceptions.hpp>
-#include <Runtime/Runtime.h>
-
-#include "eosio.system_tester.hpp"
 
 //XXX: run tests with --log_level=message (or below) to see BOOST_TEST_MESSAGE output
 
@@ -21,6 +25,9 @@ struct _abi_hash {
 FC_REFLECT( _abi_hash, (owner)(hash) );
 
 using namespace eosio_system;
+
+namespace bad = boost::adaptors;
+namespace bal = boost::algorithm;
 
 BOOST_AUTO_TEST_SUITE(eosio_system_tests)
 
@@ -2166,6 +2173,8 @@ BOOST_FIXTURE_TEST_CASE(votepay_transition, eosio_system_tester, * boost::unit_t
          }
       }
       setup_producer_accounts(producer_names);
+      BOOST_TEST_MESSAGE("registering producers: "
+         << bal::join(producer_names | bad::transformed([](const auto& e){ return e.to_string(); }), " "));
       for (const auto& p: producer_names) {
          BOOST_REQUIRE_EQUAL( success(), regproducer(p) );
          BOOST_TEST_REQUIRE(0 == get_producer_info(p)["total_votes"].as_double());
@@ -2174,7 +2183,7 @@ BOOST_FIXTURE_TEST_CASE(votepay_transition, eosio_system_tester, * boost::unit_t
       }
    }
 
-   BOOST_REQUIRE_EQUAL( success(), vote(N(producvotera), vector<account_name>(producer_names.begin(), producer_names.end())) );
+   BOOST_REQUIRE_EQUAL( success(), vote(N(producvotera), { producer_names[0] }) );
    auto* tbl = control->db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(
                   boost::make_tuple( config::system_account_name,
                                      config::system_account_name,
@@ -2190,14 +2199,15 @@ BOOST_FIXTURE_TEST_CASE(votepay_transition, eosio_system_tester, * boost::unit_t
                                      N(producers2) ) );
    BOOST_REQUIRE( !tbl );
 
-   BOOST_REQUIRE_EQUAL( success(), vote(N(producvoterb), vector<account_name>(producer_names.begin(), producer_names.end())) );
+   BOOST_REQUIRE_EQUAL( success(), vote(N(producvoterb), { producer_names[0] }) );
    tbl = control->db().find<eosio::chain::table_id_object, eosio::chain::by_code_scope_table>(
             boost::make_tuple( config::system_account_name,
                                config::system_account_name,
                                N(producers2) ) );
    BOOST_REQUIRE( !tbl );
    BOOST_REQUIRE_EQUAL( success(), regproducer(N(defproducera)) );
-   BOOST_REQUIRE( microseconds_since_epoch_of_iso_string( get_producer_info(N(defproducera))["last_claim_time"] ) < microseconds_since_epoch_of_iso_string( get_producer_info2(N(defproducera))["last_votepay_share_update"] ) );
+   BOOST_REQUIRE( microseconds_since_epoch_of_iso_string( get_producer_info(N(defproducera))["last_claim_time"] ) <
+      microseconds_since_epoch_of_iso_string( get_producer_info2(N(defproducera))["last_votepay_share_update"] ) );
 
    create_account_with_resources( N(defproducer1), config::system_account_name, STRSYM("1.0000"), false, net, cpu );
    BOOST_REQUIRE_EQUAL( success(), regproducer(N(defproducer1)) );
