@@ -472,7 +472,7 @@ namespace eosiosystem {
       check( stake_vote_quantity >= zero_asset, "must stake a positive amount" );
       check( stake_net_quantity.amount + stake_cpu_quantity.amount + stake_vote_quantity.amount > 0, "must stake a positive amount" );
       check( !transfer || from != receiver, "cannot use transfer flag if delegating to self" );
-
+      check( transfer || from == receiver || stake_vote_quantity == zero_asset, "vote can only be transfered or delegated to yourself");
       changebw( from, receiver, stake_net_quantity, stake_cpu_quantity, stake_vote_quantity, transfer);
    } // delegatebw
 

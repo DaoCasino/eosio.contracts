@@ -3516,4 +3516,48 @@ BOOST_FIXTURE_TEST_CASE( buy_pin_sell_ram, eosio_system_tester ) try {
 
 } FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE( delegate_vote_without_transfer, eosio_system_tester ) try {
+   BOOST_REQUIRE_EQUAL( wasm_assert_msg("vote can only be transfered or delegated to yourself"),
+      push_action( N(alice1111111), N(delegatebw), mvo()
+                  ("from",     "alice1111111")
+                  ("receiver", "bob111111111")
+                  ("stake_net_quantity", STRSYM("10.0000"))
+                  ("stake_cpu_quantity", STRSYM("10.0000"))
+                  ("stake_vote_quantity", STRSYM("10.0000"))
+                  ("transfer", false )
+                  , true
+      )
+   );
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( delegate_vote_with_transfer, eosio_system_tester ) try {
+   transfer( "eosio", "alice1111111", STRSYM("1000.0000"), "eosio" );
+   BOOST_REQUIRE_EQUAL( success(),
+      push_action( N(alice1111111), N(delegatebw), mvo()
+                  ("from",     "alice1111111")
+                  ("receiver", "bob111111111")
+                  ("stake_net_quantity", STRSYM("10.0000"))
+                  ("stake_cpu_quantity", STRSYM("10.0000"))
+                  ("stake_vote_quantity", STRSYM("10.0000"))
+                  ("transfer", true )
+                  , true
+      )
+   );
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( delegate_vote_to_herself, eosio_system_tester ) try {
+   transfer( "eosio", "alice1111111", STRSYM("1000.0000"), "eosio" );
+   BOOST_REQUIRE_EQUAL( success(),
+      push_action( N(alice1111111), N(delegatebw), mvo()
+                  ("from",     "alice1111111")
+                  ("receiver", "alice1111111")
+                  ("stake_net_quantity", STRSYM("10.0000"))
+                  ("stake_cpu_quantity", STRSYM("10.0000"))
+                  ("stake_vote_quantity", STRSYM("10.0000"))
+                  ("transfer", false )
+                  , true
+      )
+   );
+} FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
