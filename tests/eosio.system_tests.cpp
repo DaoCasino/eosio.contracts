@@ -3220,7 +3220,7 @@ BOOST_FIXTURE_TEST_CASE( ram_inflation, eosio_system_tester ) try {
 BOOST_FIXTURE_TEST_CASE( eosioram_ramusage, eosio_system_tester ) try {
    BOOST_REQUIRE_EQUAL( STRSYM("0.0000"), get_balance( "alice1111111" ) );
    transfer( "eosio", "alice1111111", STRSYM("1000.0000"), "eosio" );
-   BOOST_REQUIRE_EQUAL( success(), stake( "eosio", "alice1111111", STRSYM("200.0000"), STRSYM("100.0000"), STRSYM("100.0000") ) );
+   BOOST_REQUIRE_EQUAL( success(), stake( "eosio", "alice1111111", STRSYM("200.0000"), STRSYM("100.0000"), STRSYM("0.0000") ) );
 
    const asset initial_ram_balance = get_balance(N(eosio.ram));
    const asset initial_ramfee_balance = get_balance(N(eosio.ramfee));
@@ -3267,12 +3267,12 @@ BOOST_FIXTURE_TEST_CASE( ram_gift, eosio_system_tester ) try {
 
    //check that stake/unstake keeps the gift
    transfer( "eosio", "alice1111111", STRSYM("1000.0000"), "eosio" );
-   BOOST_REQUIRE_EQUAL( success(), stake( "eosio", "alice1111111", STRSYM("200.0000"), STRSYM("100.0000"), STRSYM("100.0000") ) );
+   BOOST_REQUIRE_EQUAL( success(), stake( "eosio", "alice1111111", STRSYM("200.0000"), STRSYM("100.0000"), STRSYM("0.0000") ) );
    int64_t ram_bytes_after_stake;
    rlm.get_account_limits( N(alice1111111), ram_bytes_after_stake, net_weight, cpu_weight );
    BOOST_REQUIRE_EQUAL( ram_bytes_orig, ram_bytes_after_stake );
 
-   BOOST_REQUIRE_EQUAL( success(), unstake( "eosio", "alice1111111", STRSYM("20.0000"), STRSYM("10.0000"), STRSYM("10.0000") ) );
+   BOOST_REQUIRE_EQUAL( success(), unstake( "eosio", "alice1111111", STRSYM("20.0000"), STRSYM("10.0000"), STRSYM("0.0000") ) );
    int64_t ram_bytes_after_unstake;
    rlm.get_account_limits( N(alice1111111), ram_bytes_after_unstake, net_weight, cpu_weight );
    BOOST_REQUIRE_EQUAL( ram_bytes_orig, ram_bytes_after_unstake );
