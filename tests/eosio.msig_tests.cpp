@@ -76,7 +76,7 @@ public:
                                             ("stake_net_quantity", net )
                                             ("stake_cpu_quantity", cpu )
                                             ("stake_vote_quantity", vote)
-                                            ("transfer", 0 )
+                                            ("transfer", 1 )
                                           )
                                 );
 
