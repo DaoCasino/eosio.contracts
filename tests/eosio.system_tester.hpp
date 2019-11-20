@@ -231,7 +231,7 @@ public:
                                                   asset ram = STRSYM("1.0000"),
                                                   asset cpu = STRSYM("80.0000"),
                                                   asset net = STRSYM("80.0000"),
-                                                  asset vote = STRSYM("10.0000")
+                                                  asset vote = STRSYM("0.0000")
                                                 )
    {
       account_name creator(config::system_account_name);
@@ -262,7 +262,7 @@ public:
                                                ("stake_net_quantity", net)
                                                ("stake_cpu_quantity", cpu)
                                                ("stake_vote_quantity", vote)
-                                               ("transfer", true)
+                                               ("transfer", false)
                                                )
                                    );
       }
