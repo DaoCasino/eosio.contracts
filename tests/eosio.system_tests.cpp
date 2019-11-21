@@ -1186,6 +1186,68 @@ double get_continuous_rate(double emission_rate) {
    return (pow(1 + emission_rate, 1./blocks_per_hour) - 1) * blocks_per_hour;
 }
 
+void claim_every_day(eosio_system_tester& obj, int years = 1) {
+    for(auto i = 0; i < years * 365; ++i) {
+        obj.produce_block(fc::days(1));
+        BOOST_REQUIRE_EQUAL( obj.success(), obj.push_action( "defproducer1", N(claimrewards), mvo()("owner", "defproducer1") ) );
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test::tolerance(1e-3) ) try {
+    cross_15_percent_threshold();
+
+    create_accounts_with_resources( {  N(defproducer1) } );
+    BOOST_REQUIRE_EQUAL( success(), regproducer( "defproducer1", 1) );
+
+    transfer( config::system_account_name, "alice1111111", STRSYM("130000000.0000"), config::system_account_name );
+    BOOST_REQUIRE_EQUAL( success(), stake( "alice1111111", "alice1111111", STRSYM("1.0000"), STRSYM("1.0000"), STRSYM("120000000.0000") ) );
+    BOOST_REQUIRE_EQUAL( success(), vote( N(alice1111111), { N(defproducer1) } ) );
+
+    // First case with activated_share >= 0.66 (-> emission = 0.1)
+    auto initial_global_state = get_global_state();
+    asset initial_supply = get_token_supply();
+    double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+    BOOST_REQUIRE ( 0.66 <= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() );
+    BOOST_REQUIRE_EQUAL(0.1, emission_rate);
+
+    // Second case with 0.33 <= activated_share <= 0.66 (-> 0.1 <= emission <= 0.2)
+    claim_every_day(*this, 1);
+
+    initial_global_state = get_global_state();
+    auto initial_supply_after = initial_supply.get_amount() * 1.1;
+    initial_supply = get_token_supply();
+    BOOST_TEST_REQUIRE(1.0 == initial_supply_after / initial_supply.get_amount());
+
+    emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+    BOOST_REQUIRE ( 0.66 >= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() &&
+                    0.33 <= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+    BOOST_REQUIRE(0.1 <= emission_rate && 0.2 >= emission_rate);
+
+    // Third case with 0.33 <= activated_share <= 0.66 (-> 0.1 <= emission <= 0.2)
+    produce_block(fc::days(2 * 365));
+    BOOST_REQUIRE_EQUAL( success(), push_action( "defproducer1", N(claimrewards), mvo()("owner", "defproducer1") ) );
+    initial_global_state = get_global_state();
+    initial_supply = get_token_supply();
+
+    emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+    BOOST_REQUIRE ( 0.66 >= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() &&
+                    0.33 <= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+    BOOST_REQUIRE(0.1 <= emission_rate && 0.2 >= emission_rate);
+
+    // Fourth case with 0.33 >= activated_share (-> emission = 0.2)
+    produce_block(fc::days(7 * 365));
+    BOOST_REQUIRE_EQUAL( success(), push_action( "defproducer1", N(claimrewards), mvo()("owner", "defproducer1") ) );
+    initial_global_state = get_global_state();
+    initial_supply = get_token_supply();
+
+    initial_global_state = get_global_state();
+    initial_supply = get_token_supply();
+    emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+    BOOST_REQUIRE ( 0.33 >= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() );
+    BOOST_REQUIRE_EQUAL(0.2, emission_rate);
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::tolerance(1e-2)) try {
 
    const double usecs_per_year  = 52 * 7 * 24 * 3600 * 1000000ll;
