@@ -1186,13 +1186,6 @@ double get_continuous_rate(double emission_rate) {
    return (pow(1 + emission_rate, 1./blocks_per_hour) - 1) * blocks_per_hour;
 }
 
-void claim_every_day(eosio_system_tester& obj, int years = 1) {
-    for(auto i = 0; i < years * 365; ++i) {
-        obj.produce_block(fc::days(1));
-        BOOST_REQUIRE_EQUAL( obj.success(), obj.push_action( "defproducer1", N(claimrewards), mvo()("owner", "defproducer1") ) );
-    }
-}
-
 BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test::tolerance(1e-3) ) try {
     cross_15_percent_threshold();
 
@@ -1211,10 +1204,18 @@ BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test
     BOOST_REQUIRE_EQUAL(0.1, emission_rate);
 
     // Second case with 0.33 <= activated_share <= 0.66 (-> 0.1 <= emission <= 0.2)
-    claim_every_day(*this, 1);
+
+   auto claim_every_day = [&](int years = 1) {
+      for(int i = 0; i < years * 365; i++) {
+         produce_block(fc::days(1));
+         BOOST_REQUIRE_EQUAL( success(), push_action("defproducer1", N(claimrewards), mvo()("owner", "defproducer1") ) );
+      }
+   };
+
+    claim_every_day(1);
 
     initial_global_state = get_global_state();
-    auto initial_supply_after = initial_supply.get_amount() * 1.1;
+    auto initial_supply_after = initial_supply.get_amount() * (1 + emission_rate);
     initial_supply = get_token_supply();
     BOOST_TEST_REQUIRE(1.0 == initial_supply_after / initial_supply.get_amount());
 
