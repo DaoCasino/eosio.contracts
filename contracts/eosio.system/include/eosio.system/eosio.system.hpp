@@ -188,6 +188,7 @@ namespace eosiosystem {
       eosio::asset        reserved3;
 
       uint64_t primary_key()const { return owner.value; }
+      bool is_active() const { return producers.size() || proxy; }
 
       enum class flags1_fields : uint32_t {
          ram_managed = 1,

@@ -3602,4 +3602,48 @@ BOOST_FIXTURE_TEST_CASE( stake_total_vs_active, eosio_system_tester ) try {
    BOOST_TEST_REQUIRE( (init_vote + vote_a1_p1_1).get_amount() == get_global_state()["total_activated_stake"].as<int64_t>() );
 } FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE( stake_active_revoke, eosio_system_tester ) try {
+   cross_15_percent_threshold();
+
+   const auto voter = N(voter);
+   const auto producer = N(producer);
+   const auto voter_staked = STRSYM("100.0000");
+
+   create_account_with_resources(voter, config::system_account_name, STRSYM("1.0000"), false,
+                                 STRSYM("1.0000"), STRSYM("1.0000"), STRSYM("0.0000"), true);
+   create_account_with_resources(producer, config::system_account_name, STRSYM("1.0000"), false,
+                                 STRSYM("100.0000"), STRSYM("100.0000"), STRSYM("0.0000"), true);
+   issue(voter, voter_staked, config::system_account_name);
+   regproducer(producer);
+
+   // intial state
+   BOOST_TEST_REQUIRE( 0 == get_global_state()["active_stake"].as<int64_t>() );
+
+   // stake
+   BOOST_TEST_REQUIRE( success() == stake(voter, STRSYM("0.0000"), STRSYM("0.0000"), voter_staked) );
+   BOOST_TEST_REQUIRE( success() == vote(voter, {producer}) );
+   BOOST_TEST_REQUIRE( voter_staked.get_amount() == get_global_state()["active_stake"].as<int64_t>() );
+
+   // revoke
+   BOOST_TEST_REQUIRE( success() == vote(voter, {}) );
+   BOOST_TEST_REQUIRE( 0 == get_global_state()["active_stake"].as<int64_t>());
+
+   // revoke again
+   BOOST_TEST_REQUIRE( success() == vote(voter, {}) );
+   BOOST_TEST_REQUIRE( 0 == get_global_state()["active_stake"].as<int64_t>() );
+
+   // vote
+   BOOST_TEST_REQUIRE( success() == vote(voter, {producer}) );
+   BOOST_TEST_REQUIRE( voter_staked.get_amount() == get_global_state()["active_stake"].as<int64_t>() );
+
+   // unstake everything
+   BOOST_TEST_REQUIRE( success() == unstake(voter, STRSYM("0.0000"), STRSYM("0.0000"), voter_staked) );
+   BOOST_TEST_REQUIRE( 0 == get_global_state()["active_stake"].as<int64_t>());
+
+   // stake again
+   BOOST_TEST_REQUIRE( success() == stake(voter, STRSYM("0.0000"), STRSYM("0.0000"), voter_staked) );
+   BOOST_TEST_REQUIRE( voter_staked.get_amount() == get_global_state()["active_stake"].as<int64_t>() );
+
+} FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()

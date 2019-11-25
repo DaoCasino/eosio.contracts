@@ -454,7 +454,7 @@ namespace eosiosystem {
 
       check( 0 <= voter_itr->staked, "stake for voting cannot be negative" );
 
-      if( voter_itr->producers.size() || voter_itr->proxy ) {
+      if( voter_itr->is_active()) {
          _gstate.active_stake += total_update.amount;
          update_votes( voter, voter_itr->proxy, voter_itr->producers, false );
       }

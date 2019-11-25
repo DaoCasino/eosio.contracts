@@ -249,7 +249,6 @@ namespace eosiosystem {
        */
       if( voter->last_vote_weight <= 0.0 ) {
          _gstate.total_activated_stake += voter->staked;
-         _gstate.active_stake += voter->staked;
          if( _gstate.total_activated_stake >= min_activated_stake && _gstate.thresh_activated_stake_time == time_point() ) {
             _gstate.thresh_activated_stake_time = current_time_point();
          }
@@ -341,11 +340,26 @@ namespace eosiosystem {
 
       update_total_votepay_share( ct, -total_inactive_vpay_share, delta_change_rate );
 
+      bool is_active_before = voter->is_active();
+
       _voters.modify( voter, same_payer, [&]( auto& av ) {
          av.last_vote_weight = new_vote_weight;
          av.producers = producers;
          av.proxy     = proxy;
       });
+
+      // only voting can change is_active state
+      if (voting) {
+        bool is_active_after = voter->is_active();
+
+        if (!is_active_before && is_active_after) {
+          _gstate.active_stake += voter->staked;
+        }
+
+        if (is_active_before && !is_active_after) {
+          _gstate.active_stake -= voter->staked;
+        }
+      }
    }
 
    /**
