@@ -33,6 +33,7 @@ namespace eosiosystem {
       name          owner;
       asset         net_weight;
       asset         cpu_weight;
+      // special stake for voting
       asset         vote_weight;
       int64_t       ram_bytes = 0;
       bool is_empty()const { return net_weight.amount == 0 && cpu_weight.amount == 0 && vote_weight.amount == 0 && ram_bytes == 0; }
@@ -51,6 +52,7 @@ namespace eosiosystem {
       name          to;
       asset         net_weight;
       asset         cpu_weight;
+      // special stake for voting
       asset         vote_weight;
 
       bool is_empty()const { return net_weight.amount == 0 && cpu_weight.amount == 0 && vote_weight.amount == 0; }
@@ -435,6 +437,7 @@ namespace eosiosystem {
          }
       }
 
+      // voting power is determinted by staked vote
       update_voting_power( from, stake_vote_delta);
    }
 
@@ -472,6 +475,7 @@ namespace eosiosystem {
       check( stake_vote_quantity >= zero_asset, "must stake a positive amount" );
       check( stake_net_quantity.amount + stake_cpu_quantity.amount + stake_vote_quantity.amount > 0, "must stake a positive amount" );
       check( !transfer || from != receiver, "cannot use transfer flag if delegating to self" );
+      // vote delegation to receiver != from is disallowed because he cannot vote with it
       check( transfer || from == receiver || stake_vote_quantity == zero_asset, "vote can only be transfered or delegated to yourself");
       changebw( from, receiver, stake_net_quantity, stake_cpu_quantity, stake_vote_quantity, transfer);
    } // delegatebw

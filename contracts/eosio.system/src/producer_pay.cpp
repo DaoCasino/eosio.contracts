@@ -82,6 +82,7 @@ namespace eosiosystem {
       } else if (activated_share >= 0.66) {
          return 0.1;
       }
+      // descending linear function from 0.33 to 0.66
       return -10. / 33 * (activated_share - 0.33) + 0.2;
    }
 
@@ -109,7 +110,7 @@ namespace eosiosystem {
          double emission_rate = get_target_emission_per_year(1.0 * _gstate.active_stake / token_supply.amount);
          double continuous_rate = get_continuous_rate(emission_rate);
          auto new_tokens = static_cast<int64_t>(continuous_rate * token_supply.amount * usecs_since_last_fill / useconds_per_year);
-         auto to_dao     = new_tokens / 5;
+         auto to_dao     = new_tokens / 5; // goes to eosio.saving account
          auto to_producers  = new_tokens - to_dao;
          auto to_per_block_pay = to_producers / 4;
          auto to_per_vote_pay  = to_producers - to_per_block_pay;

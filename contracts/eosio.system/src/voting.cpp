@@ -101,9 +101,10 @@ namespace eosiosystem {
 
       std::vector< std::pair<eosio::producer_key,uint16_t> > top_producers;
       const asset token_supply = eosio::token::get_supply(token_account, core_symbol().code() );
-      int32_t activated_share = 100 * _gstate.active_stake / token_supply.amount;
+      const int32_t activated_share = 100 * _gstate.active_stake / token_supply.amount;
       int32_t target_schedule_size = _gstate.target_producer_schedule_size;
 
+      // update target every 24 hours
       if (block_time.slot - _gstate.last_target_schedule_size_update.slot >= 2 * _gstate.schedule_update_interval) {
         int32_t target_amount = get_target_amount(activated_share);
         if (target_amount > target_schedule_size) {
@@ -124,6 +125,7 @@ namespace eosiosystem {
          if (itr != del_tbl.end()) {
             total_staked = itr->net_weight + itr->cpu_weight + itr->vote_weight;
          }
+         // producer has to stake at least min_producer_activated_share of the supply
          if (total_staked.amount >= min_producer_activated_share * token_supply.amount) {
             top_producers.emplace_back( std::pair<eosio::producer_key,uint16_t>({{it->owner, it->producer_key}, it->location}) );
          }
@@ -343,7 +345,7 @@ namespace eosiosystem {
 
       update_total_votepay_share( ct, -total_inactive_vpay_share, delta_change_rate );
 
-      bool is_active_before = voter->is_active();
+      const bool is_active_before = voter->is_active();
 
       _voters.modify( voter, same_payer, [&]( auto& av ) {
          av.last_vote_weight = new_vote_weight;
@@ -353,7 +355,7 @@ namespace eosiosystem {
 
       // only voting can change is_active state
       if (voting) {
-        bool is_active_after = voter->is_active();
+        const bool is_active_after = voter->is_active();
 
         if (!is_active_before && is_active_after) {
           _gstate.active_stake += voter->staked;
