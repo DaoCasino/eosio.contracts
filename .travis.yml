@@ -2,23 +2,24 @@ language: c
 git:
   depth: false
 services:
-  - docker
+- docker
 matrix:
   fast_finish: true
 jobs:
   include:
-    - stage: build
-      script:
-        - set -e
-        - rm -rf build
-        - ./cicd/run build
-        - ./cicd/run test
-        - ./cicd/run pack
-
+  - stage: build
+    script:
+    - set -e
+    - rm -rf build
+    - "./cicd/run build"
+    - "./cicd/run test"
+    - "./cicd/run pack"
 deploy:
   provider: releases
   api_key:
-    secure: "W7eEQBjQey098auzprA8RZfeSmA8r/Aq8mgqDPE1quzMiAZ2q/dyMI9t4b4aZ58bMeIHyu4sr4Qdcmxq3sDUBnE9G85Ju8s7tjverQabdr9SR0F0QILQxleUWMdvi0n+933M/O0qM5jdgPrPzsKuch0kHAZCFypX6/fsGvRpyrGTvRLhDZhSHcV84mgdcwG0/D9kDDAkazN/ASb8uR6yh0NrXNTM42MiHT6lpGvIl5fxDgGAnpE0s25h+fPExQD/R+9XKxjrzYbAxA2b0PXEtRWiOErnZ1Ynqyr/06nqprrVRRDCgETGAzgIbaF7qL4sDTGI4YKO/H2Q9Xd7s4l3zSFml/CyQreHg6/vXdQdn1ZIpuT7G57y28VXcMArBtiwHn9iCJRLY+5l2lvXAdYvZnDgKnM4Lg5oScN3uTodDsERysZew8w2GP+QDsothgGJiPjla8A8LT/CC/4maIqVHWGxqeyCd6jjTqBoEs0JDcXbBkAa8uQU6KWibDDCraOc91LVnCHUlC+KCMQ0+0d4CvtXuPfJVjG3qnv3sR++GByJQNnLgkI4IPP1VykhKtgGvgiCIC7rVujB+OnIUuZBqyGf5zrOizu/coX2Y1BvlAMqKJZags77M/IqTDxCvtL71WrW3D6FW2GQbeblR2T9nDDc4K+0HE5XQUnEdJOAVhE="
+    # github: Settings -> Developer settings -> Personal access tokens -> Generate new token
+    # in repo root: travis login ; travis encrypt <github token>
+    secure: "T/qIv0FfvSbUu2OLpV+TyRDrQy5t2CVdCJmHjh28PgGvxmr74+XPEo1B89lI+EdE0BKibhn4rfbfFP8A4i4VNbShQz2XehyDCfHzP2EpbzqKWGkWs1vIfesyV7vYU7R3iro95gbbLQM/kZfTw4oVlLQiz6ZE55ULbrOrx9fAcYC/+2LpC+oGBb6c/hFHFsaVTDZEGADkseRHxEc1oN1RXoxOwJhLkYGBrQTzmcKJNvYnnQ4qNNE70aPugrEJUyFE0aCkfg2QNWJuUlMRV4ldoVe4nRFmaOyPSS/Webbyi/iOkXRpCgL5Lo3DJ0mEu904fHXmT1Syn/oKibYTT2BfRy22o+FVDcnD9bIYFDyP4q/iWEDXp3Phlt7vV2vq4v2aAj9yT/hXjgb66Qk7+TkgPT1TKoo51L9JEWaJs6MTacg6iI7lub0kreyBsn4s/x8s+3w6sZ7BQpgu5CNUfEdECF2KwMJqF8HmFFj+MsnNGPVYNqzYMlqDLcURCfh59YHvbyKfcTAAt6yWZmeMy0NLwawWmItOYG6f+CY2Tif7lYl5YZkDeCKGIS8sH/uoua7FwZ3CmgEdrFIqhf1XWmuVxjcAabsZ1sDV91x4KQyCWcfuXawPGUUJXtKotN8gVbo3A4LgYmPMSx6cCTIpFRNzzqQLAl1y6vNn4CnPhElKRQs="
   file_glob: true
   file: build/assets/*
   skip_cleanup: true
