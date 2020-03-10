@@ -18,6 +18,9 @@
 #include <typeinfo>
 
 //XXX: run tests with --log_level=message (or below) to see BOOST_TEST_MESSAGE output
+// e.g.:
+//   ./cicd/build.sh --build-tests --build-type Debug && \
+//      ./build/tests/unit_test -l all -r detailed -t eosio_system_tests/stake_validators_correlation -- --verbose ; echo $?
 
 struct _abi_hash {
    name owner;
@@ -38,10 +41,10 @@ namespace bal = boost::algorithm;
 
 BOOST_AUTO_TEST_SUITE(eosio_system_tests)
 
-bool within_error(int64_t a, int64_t b, int64_t err) { return std::abs(a - b) <= err; };
-bool within_one(int64_t a, int64_t b) { return within_error(a, b, 1); }
+static bool within_error(int64_t a, int64_t b, int64_t err) { return std::abs(a - b) <= err; };
+static bool within_one(int64_t a, int64_t b) { return within_error(a, b, 1); }
 
-double get_target_emission_per_year(double activated_share) {
+static double get_target_emission_per_year(double activated_share) {
    if (activated_share <= 0.33) {
       return 0.2;
    } else if (activated_share >= 0.66) {
@@ -50,7 +53,7 @@ double get_target_emission_per_year(double activated_share) {
    return -10. / 33 * (activated_share - 0.33) + 0.2;
 }
 
-double get_continuous_rate(double emission_rate) {
+static double get_continuous_rate(double emission_rate) {
    static const uint32_t blocks_per_hour = 2 * 3600;
    return (pow(1 + emission_rate, 1./blocks_per_hour) - 1) * blocks_per_hour;
 }
@@ -3920,39 +3923,98 @@ BOOST_FIXTURE_TEST_CASE( stake_validators_correlation, eosio_system_tester ) try
    BOOST_TEST_MESSAGE("state: " << variant_to_string(get_global_state()));
    //BOOST_TEST_MESSAGE("state: " << get_global_state()); // TODO: make it working
 
-   const unsigned nproducers = 150;
-   const unsigned mix_active_producers = 21;
-   const unsigned max_active_producers = 102; // maximum number of active producers
-   const unsigned max_schedule_update_delta = 3; // contract allows to add/remove maximum 3 producers per 24 hours
+   const size_t nproducers = 50;
+   //const unsigned max_active_producers = 102; // maximum number of active producers
+   //const unsigned max_schedule_update_delta = 3; // contract allows to add/remove maximum 3 producers per 24 hours
 
    const auto producers = generate_names(nproducers);
-   const asset vote_stake{get_token_supply().get_amount() / (nproducers+10), symbol(4,CORE_SYM_NAME)};
+   BOOST_TEST_MESSAGE("producer namess: " << bal::join(producers | bad::transformed([](const auto& e){ return e.to_string(); }), " "));
+
+   const asset vote_stake = core_sym::from_int(get_token_supply().get_amount() / nproducers / 3);
    BOOST_TEST_MESSAGE("vote stake used for each BP: " << vote_stake.to_string());
 
-   for (const auto& p : producers) {
-      create_account_with_resources(p, config::system_account_name, STRSYM("1.0000"), false,
-                                    STRSYM("100.0000"), STRSYM("100.0000"), vote_stake, true);
+   size_t registered_prods = 0;
+
+   // 1
+
+   // register some BPs to gain 33% of activated share
+   while (get_activated_share() < 33 && registered_prods < producers.size()) {
+      const auto& p = producers[registered_prods++];
+
+      create_account_with_resources(p, config::system_account_name, STRSYM("10.0000"), false, STRSYM("100.0000"), STRSYM("100.0000"), vote_stake, true);
       regproducer(p);
       vote(p, {p});
 
-      BOOST_TEST_MESSAGE("active stake = " << get_global_state()["active_stake"].as<int64_t>());
+      produce_block(fc::hours(25));
+      produce_blocks(10);
    }
-   BOOST_TEST_MESSAGE("registered producers: " <<
-      bal::join(producers | bad::transformed([](const auto& e){ return e.to_string(); }), " "));
+
+   // check registered & active BPs (optional)
+   BOOST_TEST_MESSAGE("activated_share = " << get_activated_share()
+      << "; registered BPs = " << registered_prods
+      << "; active BPs = " << active_producers_num()
+      << "; head_block_num = " << head_block_num());
+   BOOST_TEST(registered_prods == 50);
+   BOOST_TEST(active_producers_num() == 21);
+
+   // wait until 21 BPs are activated; other BPs should not be activated
+   while (active_producers_num() < 21) {
+      produce_blocks(10);
+   }
+   BOOST_TEST_MESSAGE("head_block_num = " << head_block_num() << "; active BPs: " << active_producers_num());
+
+   // generate some more blocks: schedule still contains 21 BPs
+   for (size_t i = 0; i < 15; i++) {
+      produce_blocks(50);
+      BOOST_REQUIRE_EQUAL(21, active_producers_num());
+   }
+
+   // 2
+
+   //FIXME: only 21 BPs are checked below; increase their number
+
+   // add mode BPs
+   while (get_activated_share() < 40 && registered_prods < producers.size()) {
+      const auto& p = producers[registered_prods++];
+
+      create_account_with_resources(p, config::system_account_name, STRSYM("10.0000"), false, STRSYM("100.0000"), STRSYM("100.0000"), vote_stake, true);
+      regproducer(p);
+      vote(p, {p});
+
+      BOOST_TEST_MESSAGE("BP registered; activated_share = " << get_activated_share()
+         << "; registered BPs = " << registered_prods
+         << "; active BPs = " << active_producers_num());
+
+      produce_block(fc::hours(25));
+      produce_blocks(10);
+   }
+
+   // create rest producers
+   while (registered_prods < producers.size()) {
+      const auto& p = producers[registered_prods++];
+      create_account_with_resources(p, config::system_account_name, STRSYM("10.0000"), false, STRSYM("100.0000"), STRSYM("100.0000"), vote_stake, true);
+      regproducer(p);
+      vote(p, {p});
+      BOOST_TEST_MESSAGE("producer " << (registered_prods-1) << " created");
+   }
+
+   // wait until target_producers_num BPs are activated; other BPs should not be activated
+   const size_t target_producers_num = 21 + (get_activated_share() - 33) * 3; // see voting.cpp
+   BOOST_TEST_MESSAGE("wait for " << target_producers_num << " active BPs...");
+   while (active_producers_num() < target_producers_num) {
+      produce_blocks(50);
+      BOOST_TEST_MESSAGE("active BPs: " << active_producers_num());
+   }
+   BOOST_TEST_MESSAGE("activated_share = " << get_activated_share()
+      << "; registered BPs = " << registered_prods
+      << "; active BPs = " << active_producers_num()
+      << "; head_block_num = " << head_block_num());
+
+   BOOST_REQUIRE_EQUAL(target_producers_num, active_producers_num());
+
    BOOST_TEST_MESSAGE("state: " << variant_to_string(get_global_state()));
    BOOST_TEST_MESSAGE("active stake = " << get_global_state()["active_stake"].as<int64_t>() <<
                       "; total stake = " << get_token_supply().to_string());
-
-   BOOST_TEST_MESSAGE("-----------------------------------------");
-
-   for (int i = 0; i < max_active_producers/max_schedule_update_delta + 1; i++) {
-      produce_block(fc::hours(24));
-      produce_blocks(666);
-      BOOST_TEST_MESSAGE("Head block producers size: " << control->active_producers().producers.size());
-   }
-   BOOST_TEST_REQUIRE( 102 == control->active_producers().producers.size() );
-
-   //TODO: check other variants (21 BP, etc.)
 
 } FC_LOG_AND_RETHROW()
 

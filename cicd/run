@@ -2,7 +2,7 @@
 
 set -eux
 
-run_node_with_cdt_cmd="docker run --rm -v "$PWD":/daobet.contracts -w /daobet.contracts -ti daocasino/daobet-with-cdt:latest"
+run_node_with_cdt_cmd="docker run --rm -v $PWD:/daobet.contracts -w /daobet.contracts -ti daocasino/daobet-with-cdt:latest"
 
 cmd="${1:?}"
 shift

@@ -522,11 +522,24 @@ public:
       return get_stats("4," CORE_SYM_NAME)["supply"].as<asset>();
    }
 
+   int64_t get_activated_share() const {
+      const int64_t active_stake = get_global_state()["active_stake"].as<int64_t>();
+      return 100 * active_stake / get_token_supply().get_amount(); // voting.cpp
+   }
+
+   size_t active_producers_num() const {
+      return control->active_producers().producers.size();
+   }
+
+   uint32_t head_block_num() const {
+      return control->head_block_num();
+   }
+
    uint64_t microseconds_since_epoch_of_iso_string( const fc::variant& v ) {
       return static_cast<uint64_t>( time_point::from_iso_string( v.as_string() ).time_since_epoch().count() );
    }
 
-   fc::variant get_global_state() {
+   fc::variant get_global_state() const {
       vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(global), N(global) );
       if (data.empty()) std::cout << "\nData is empty\n" << std::endl;
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "eosio_global_state", data, abi_serializer_max_time );
