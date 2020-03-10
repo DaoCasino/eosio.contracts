@@ -33,10 +33,10 @@ using mvo = fc::mutable_variant_object;
 #define STRSYM(str) core_sym::from_string(str)
 
 /// Number of initially issued tokens.
-#define TOKENS_ISSUED 1672708210L
+#define TOKENS_ISSUED 167270821L
 
 #define TOKEN_PRECISION 4
-#define TOKEN_FRACTIONAL_PART_MULTIPLIER 1000 // 10^{TOKEN_PRECISION-1}
+#define TOKEN_FRACTIONAL_PART_MULTIPLIER 10000 // 10^TOKEN_PRECISION
 
 
 namespace eosio_system {
@@ -114,9 +114,9 @@ public:
    void create_core_token( symbol core_symbol = symbol{CORE_SYM} ) {
       const int64_t tokens_issued_asset = TOKENS_ISSUED * TOKEN_FRACTIONAL_PART_MULTIPLIER;
 
-      FC_ASSERT( core_symbol.precision() != TOKEN_PRECISION, "create_core_token assumes precision of core token is 4" );
+      FC_ASSERT( core_symbol.decimals() == TOKEN_PRECISION, "create_core_token assumes precision of core token is 4" );
       create_currency( N(eosio.token), config::system_account_name, asset(100000000000000, core_symbol) );
-      issue(config::system_account_name, asset(tokens_issued_asset, core_symbol) );
+      issue( asset(tokens_issued_asset, core_symbol) );
       BOOST_REQUIRE_EQUAL( asset(tokens_issued_asset, core_symbol), get_balance( "eosio", core_symbol ) );
    }
 
@@ -148,7 +148,7 @@ public:
 
       debug_balances({ N(eosio), N(eosio.ramfee), N(eosio.stake), N(eosio.ram) });
 
-      const std::string eosio_total_balances = std::to_string(TOKENS_ISSUED / 10) + "." + std::string(TOKEN_PRECISION, '0');
+      const std::string eosio_total_balances = std::to_string(TOKENS_ISSUED) + "." + std::string(TOKEN_PRECISION, '0');
       BOOST_REQUIRE_EQUAL( STRSYM(eosio_total_balances),
          get_balance("eosio") + get_balance("eosio.ramfee") + get_balance("eosio.stake") + get_balance("eosio.ram") );
    }
@@ -429,8 +429,8 @@ public:
    }
 
    fc::variant get_name_bid( const account_name& act ) const {
-      vector<char> data = get_row_by_account( config::system_account_name, act, N(namebids), act );
-      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "name_bid_table", data, abi_serializer_max_time );
+      vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(namebids), act );
+      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "name_bid", data, abi_serializer_max_time );
    }
 
    void debug_name_bids( const std::vector<account_name>& accounts ) const {
@@ -462,11 +462,11 @@ public:
       base_tester::push_action(contract, N(create), contract, act);
    }
 
-   void issue( const name& to, const asset& amount, const name& manager = config::system_account_name ) {
+   void issue( const asset& amount, const name& manager = config::system_account_name ) {
       base_tester::push_action( N(eosio.token), N(issue), manager, mutable_variant_object()
-                                       ("to",       to)
-                                       ("quantity", amount)
-                                       ("memo",     "") );
+                                ("to",       manager)
+                                ("quantity", amount)
+                                ("memo",     "") );
    }
    void transfer( const name& from, const name& to, const asset& amount, const name& manager = config::system_account_name ) {
       base_tester::push_action( N(eosio.token), N(transfer), manager, mutable_variant_object()
@@ -476,31 +476,70 @@ public:
                                        ("memo",     "") );
    }
 
-   double stake2votes( const asset& stake ) {
+   void issue_and_transfer( const name& to, const asset& amount, const name& manager = config::system_account_name ) {
+      signed_transaction trx;
+      trx.actions.emplace_back( get_action( N(eosio.token), N(issue),
+                                            vector<permission_level>{{manager, config::active_name}},
+                                            mutable_variant_object()
+                                            ("to",       manager )
+                                            ("quantity", amount )
+                                            ("memo",     "")
+                                            )
+                                );
+      if ( to != manager ) {
+         trx.actions.emplace_back( get_action( N(eosio.token), N(transfer),
+                                               vector<permission_level>{{manager, config::active_name}},
+                                               mutable_variant_object()
+                                               ("from",     manager)
+                                               ("to",       to )
+                                               ("quantity", amount )
+                                               ("memo",     "")
+                                               )
+                                   );
+      }
+      set_transaction_headers( trx );
+      trx.sign( get_private_key( manager, "active" ), control->get_chain_id()  );
+      push_transaction( trx );
+   }
+
+   double stake2votes( const asset& stake ) const {
       auto now = control->pending_block_time().time_since_epoch().count() / 1000000;
       return stake.get_amount() * pow(2, int64_t((now - (config::block_timestamp_epoch / 1000)) / (86400 * 7))/ double(52) ); // 52 week periods (i.e. ~years)
    }
 
-   double stake2votes( const string& s ) {
+   double stake2votes( const string& s ) const {
       return stake2votes( STRSYM(s) );
    }
 
-   fc::variant get_stats( const string& symbolname ) {
+   fc::variant get_stats( const string& symbolname ) const {
       auto symb = eosio::chain::symbol::from_string(symbolname);
       auto symbol_code = symb.to_symbol_code().value;
       vector<char> data = get_row_by_account( N(eosio.token), symbol_code, N(stat), symbol_code );
       return data.empty() ? fc::variant() : token_abi_ser.binary_to_variant( "currency_stats", data, abi_serializer_max_time );
    }
 
-   asset get_token_supply() {
+   asset get_token_supply() const {
       return get_stats("4," CORE_SYM_NAME)["supply"].as<asset>();
+   }
+
+   int64_t get_activated_share() const {
+      const int64_t active_stake = get_global_state()["active_stake"].as<int64_t>();
+      return 100 * active_stake / get_token_supply().get_amount(); // voting.cpp
+   }
+
+   size_t active_producers_num() const {
+      return control->active_producers().producers.size();
+   }
+
+   uint32_t head_block_num() const {
+      return control->head_block_num();
    }
 
    uint64_t microseconds_since_epoch_of_iso_string( const fc::variant& v ) {
       return static_cast<uint64_t>( time_point::from_iso_string( v.as_string() ).time_since_epoch().count() );
    }
 
-   fc::variant get_global_state() {
+   fc::variant get_global_state() const {
       vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(global), N(global) );
       if (data.empty()) std::cout << "\nData is empty\n" << std::endl;
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "eosio_global_state", data, abi_serializer_max_time );
@@ -519,6 +558,23 @@ public:
    fc::variant get_refund_request( name account ) {
       vector<char> data = get_row_by_account( config::system_account_name, account, N(refunds), account );
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "refund_request", data, abi_serializer_max_time );
+   }
+
+#ifndef NDEBUG
+   fc::variant get_dlogs() const {
+      vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(dlogs), N(dlogs) );
+      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "dlogs", data, abi_serializer_max_time );
+   }
+#endif // NDEBUG
+
+   void print_debug_logs() const {
+#ifndef NDEBUG
+      std::string dlog;
+      for (const auto& log : get_dlogs()["data"].as<std::vector<std::string>>()) {
+         dlog += "  " + log + "\n";
+      }
+      BOOST_TEST_MESSAGE("debug log:\n" + dlog);
+#endif // NDEBUG
    }
 
    abi_serializer initialize_multisig() {

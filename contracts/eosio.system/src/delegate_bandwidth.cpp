@@ -1,102 +1,37 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE.txt
- */
+#include <eosio/datastream.hpp>
+#include <eosio/eosio.hpp>
+#include <eosio/multi_index.hpp>
+#include <eosio/privileged.hpp>
+#include <eosio/serialize.hpp>
+#include <eosio/transaction.hpp>
+
 #include <eosio.system/eosio.system.hpp>
-
-#include <eosiolib/eosio.hpp>
-#include <eosiolib/datastream.hpp>
-#include <eosiolib/serialize.hpp>
-#include <eosiolib/multi_index.hpp>
-#include <eosiolib/privileged.h>
-#include <eosiolib/transaction.hpp>
-
 #include <eosio.token/eosio.token.hpp>
 
-
-#include <cmath>
-#include <map>
+#include "name_bidding.cpp"
+// Unfortunately, this is needed until CDT fixes the duplicate symbol error with eosio::send_deferred
 
 namespace eosiosystem {
+
    using eosio::asset;
-   using eosio::indexed_by;
    using eosio::const_mem_fun;
+   using eosio::current_time_point;
+   using eosio::indexed_by;
    using eosio::permission_level;
+   using eosio::seconds;
    using eosio::time_point_sec;
-   using std::map;
-   using std::pair;
-
-   static constexpr uint32_t refund_delay_sec = 14*24*3600;
-   static constexpr int64_t  ram_gift_bytes = 1400;
-
-   struct [[eosio::table, eosio::contract("eosio.system")]] user_resources {
-      name          owner;
-      asset         net_weight;
-      asset         cpu_weight;
-      // special stake for voting
-      asset         vote_weight;
-      int64_t       ram_bytes = 0;
-      bool is_empty()const { return net_weight.amount == 0 && cpu_weight.amount == 0 && vote_weight.amount == 0 && ram_bytes == 0; }
-      uint64_t primary_key()const { return owner.value; }
-
-      // explicit serialization macro is not necessary, used here only to improve compilation time
-      EOSLIB_SERIALIZE( user_resources, (owner)(net_weight)(cpu_weight)(vote_weight)(ram_bytes) )
-   };
-
-
-   /**
-    *  Every user 'from' has a scope/table that uses every receipient 'to' as the primary key.
-    */
-   struct [[eosio::table, eosio::contract("eosio.system")]] delegated_bandwidth {
-      name          from;
-      name          to;
-      asset         net_weight;
-      asset         cpu_weight;
-      // special stake for voting
-      asset         vote_weight;
-
-      bool is_empty()const { return net_weight.amount == 0 && cpu_weight.amount == 0 && vote_weight.amount == 0; }
-      uint64_t  primary_key()const { return to.value; }
-
-      // explicit serialization macro is not necessary, used here only to improve compilation time
-      EOSLIB_SERIALIZE( delegated_bandwidth, (from)(to)(net_weight)(cpu_weight)(vote_weight) )
-
-   };
-
-   struct [[eosio::table, eosio::contract("eosio.system")]] refund_request {
-      name            owner;
-      time_point_sec  request_time;
-      eosio::asset    net_amount;
-      eosio::asset    cpu_amount;
-      eosio::asset    vote_amount;
-
-      bool is_empty()const { return net_amount.amount == 0 && cpu_amount.amount == 0 && vote_amount.amount == 0; }
-      uint64_t  primary_key()const { return owner.value; }
-
-      // explicit serialization macro is not necessary, used here only to improve compilation time
-      EOSLIB_SERIALIZE( refund_request, (owner)(request_time)(net_amount)(cpu_amount)(vote_amount) )
-   };
-
-   /**
-    *  These tables are designed to be constructed in the scope of the relevant user, this
-    *  facilitates simpler API for per-user queries
-    */
-   typedef eosio::multi_index< "userres"_n, user_resources >      user_resources_table;
-   typedef eosio::multi_index< "delband"_n, delegated_bandwidth > del_bandwidth_table;
-   typedef eosio::multi_index< "refunds"_n, refund_request >      refunds_table;
-
-
+   using eosio::token;
 
    /**
     *  This action will buy an exact amount of ram and bill the payer the current market price.
     */
-   void system_contract::buyrambytes( name payer, name receiver, uint32_t bytes ) {
-
+   void system_contract::buyrambytes( const name& payer, const name& receiver, uint32_t bytes ) {
       auto itr = _rammarket.find(ramcore_symbol.raw());
-      auto tmp = *itr;
-      auto eosout = tmp.convert( asset(bytes, ram_symbol), core_symbol() );
-
-      buyram( payer, receiver, eosout );
+      const int64_t ram_reserve   = itr->base.balance.amount;
+      const int64_t eos_reserve   = itr->quote.balance.amount;
+      const int64_t cost          = exchange_state::get_bancor_input( ram_reserve, eos_reserve, bytes );
+      const int64_t cost_plus_fee = cost / double(0.995);
+      buyram( payer, receiver, asset{ cost_plus_fee, core_symbol() } );
    }
 
 
@@ -108,7 +43,7 @@ namespace eosiosystem {
     *  RAM is a scarce resource whose supply is defined by global properties max_ram_size. RAM is
     *  priced using the bancor algorithm such that price-per-byte with a constant reserve ratio of 100:1.
     */
-   void system_contract::buyram( name payer, name receiver, asset quant )
+   void system_contract::buyram( const name& payer, const name& receiver, const asset& quant )
    {
       require_auth( payer );
       update_ram_supply();
@@ -125,24 +60,20 @@ namespace eosiosystem {
       quant_after_fee.amount -= fee.amount;
       // quant_after_fee.amount should be > 0 if quant.amount > 1.
       // If quant.amount == 1, then quant_after_fee.amount == 0 and the next inline transfer will fail causing the buyram action to fail.
-
-      INLINE_ACTION_SENDER(eosio::token, transfer)(
-         token_account, { {payer, active_permission}, {ram_account, active_permission} },
-         { payer, ram_account, quant_after_fee, std::string("buy ram") }
-      );
-
-      if( fee.amount > 0 ) {
-         INLINE_ACTION_SENDER(eosio::token, transfer)(
-            token_account, { {payer, active_permission} },
-            { payer, ramfee_account, fee, std::string("ram fee") }
-         );
+      {
+         token::transfer_action transfer_act{ token_account, { {payer, active_permission}, {ram_account, active_permission} } };
+         transfer_act.send( payer, ram_account, quant_after_fee, "buy ram" );
       }
-      
+      if ( fee.amount > 0 ) {
+         token::transfer_action transfer_act{ token_account, { {payer, active_permission} } };
+         transfer_act.send( payer, ramfee_account, fee, "ram fee" );
+      }
+
       int64_t bytes_out;
 
       const auto& market = _rammarket.get(ramcore_symbol.raw(), "ram market does not exist");
       _rammarket.modify( market, same_payer, [&]( auto& es ) {
-          bytes_out = es.convert( quant_after_fee,  ram_symbol ).amount;
+         bytes_out = es.direct_convert( quant_after_fee,  ram_symbol ).amount;
       });
 
       check( bytes_out > 0, "must reserve a positive amount" );
@@ -150,7 +81,7 @@ namespace eosiosystem {
       _gstate.total_ram_bytes_reserved += uint64_t(bytes_out);
       _gstate.total_ram_stake          += quant_after_fee.amount;
 
-      user_resources_table  userres( _self, receiver.value );
+      user_resources_table  userres( get_self(), receiver.value );
       auto res_itr = userres.find( receiver.value );
       if( res_itr ==  userres.end() ) {
          res_itr = userres.emplace( receiver, [&]( auto& res ) {
@@ -169,8 +100,8 @@ namespace eosiosystem {
       auto voter_itr = _voters.find( res_itr->owner.value );
       if( voter_itr == _voters.end() || !has_field( voter_itr->flags1, voter_info::flags1_fields::ram_managed ) ) {
          int64_t ram_bytes, net, cpu;
-         get_resource_limits( res_itr->owner.value, &ram_bytes, &net, &cpu );
-         set_resource_limits( res_itr->owner.value, res_itr->ram_bytes + ram_gift_bytes, net, cpu );
+         get_resource_limits( res_itr->owner, ram_bytes, net, cpu );
+         set_resource_limits( res_itr->owner, res_itr->ram_bytes + ram_gift_bytes, net, cpu );
       }
    }
 
@@ -180,13 +111,13 @@ namespace eosiosystem {
     *  tomorrow. Overall this will result in the market balancing the supply and demand
     *  for RAM over time.
     */
-   void system_contract::sellram( name account, int64_t bytes ) {
+   void system_contract::sellram( const name& account, int64_t bytes ) {
       require_auth( account );
       update_ram_supply();
 
       check( bytes > 0, "cannot sell negative byte" );
 
-      user_resources_table  userres( _self, account.value );
+      user_resources_table  userres( get_self(), account.value );
       auto res_itr = userres.find( account.value );
       check( res_itr != userres.end(), "no resource row" );
       check( res_itr->ram_bytes >= bytes, "insufficient quota" );
@@ -194,8 +125,8 @@ namespace eosiosystem {
       asset tokens_out;
       auto itr = _rammarket.find(ramcore_symbol.raw());
       _rammarket.modify( itr, same_payer, [&]( auto& es ) {
-          /// the cast to int64_t of bytes is safe because we certify bytes is <= quota which is limited by prior purchases
-          tokens_out = es.convert( asset(bytes, ram_symbol), core_symbol());
+         /// the cast to int64_t of bytes is safe because we certify bytes is <= quota which is limited by prior purchases
+         tokens_out = es.direct_convert( asset(bytes, ram_symbol), core_symbol());
       });
 
       check( tokens_out.amount > 1, "token amount received from selling ram is too low" );
@@ -213,40 +144,48 @@ namespace eosiosystem {
       auto voter_itr = _voters.find( res_itr->owner.value );
       if( voter_itr == _voters.end() || !has_field( voter_itr->flags1, voter_info::flags1_fields::ram_managed ) ) {
          int64_t ram_bytes, net, cpu;
-         get_resource_limits( res_itr->owner.value, &ram_bytes, &net, &cpu );
-         set_resource_limits( res_itr->owner.value, res_itr->ram_bytes + ram_gift_bytes, net, cpu );
+         get_resource_limits( res_itr->owner, ram_bytes, net, cpu );
+         set_resource_limits( res_itr->owner, res_itr->ram_bytes + ram_gift_bytes, net, cpu );
       }
 
-      INLINE_ACTION_SENDER(eosio::token, transfer)(
-         token_account, { {ram_account, active_permission}, {account, active_permission} },
-         { ram_account, account, asset(tokens_out), std::string("sell ram") }
-      );
-
+      {
+         token::transfer_action transfer_act{ token_account, { {ram_account, active_permission}, {account, active_permission} } };
+         transfer_act.send( ram_account, account, asset(tokens_out), "sell ram" );
+      }
       auto fee = ( tokens_out.amount + 199 ) / 200; /// .5% fee (round up)
       // since tokens_out.amount was asserted to be at least 2 earlier, fee.amount < tokens_out.amount
-      if( fee > 0 ) {
-         INLINE_ACTION_SENDER(eosio::token, transfer)(
-            token_account, { {account, active_permission} },
-            { account, ramfee_account, asset(fee, core_symbol()), std::string("sell ram fee") }
-         );
+      if ( fee > 0 ) {
+         token::transfer_action transfer_act{ token_account, { {account, active_permission} } };
+         transfer_act.send( account, ramfee_account, asset(fee, core_symbol()), "sell ram fee" );
       }
    }
 
+   void validate_b1_vesting( int64_t stake ) {
+      const int64_t base_time = 1527811200; /// 2018-06-01
+      const int64_t max_claimable = 100'000'000'0000ll;
+      const int64_t claimable = int64_t(max_claimable * double(current_time_point().sec_since_epoch() - base_time) / (10*seconds_per_year) );
+
+      check( max_claimable - claimable <= stake, "b1 can only claim their tokens over 10 years" );
+   }
+
    void system_contract::changebw( name from, name receiver,
-                                   const asset stake_net_delta, 
-                                   const asset stake_cpu_delta, 
-                                   const asset stake_vote_delta, 
+                                   const asset& stake_net_delta,
+                                   const asset& stake_cpu_delta,
+                                   const asset& stake_vote_delta,
                                    bool transfer )
    {
       require_auth( from );
       check( stake_net_delta.amount != 0 || stake_cpu_delta.amount != 0 || stake_vote_delta.amount != 0, "should stake non-zero amount" );
+      ///@{
+      ///DAO
       auto check_asset_sign = [](const asset& fst, const asset& snd) {
          return std::abs( (fst + snd).amount ) >= std::max( std::abs( fst.amount ), std::abs( snd.amount ) );
       };
 
-      check(check_asset_sign(stake_net_delta, stake_cpu_delta) && 
+      check(check_asset_sign(stake_net_delta, stake_cpu_delta) &&
             check_asset_sign(stake_cpu_delta, stake_vote_delta) &&
-            check_asset_sign(stake_net_delta, stake_vote_delta), "net, cpu and vote deltas should not have opposite signs");
+            check_asset_sign(stake_net_delta, stake_vote_delta), "net, cpu and, vote deltas should not have opposite signs");
+      ///@}
 
       name source_stake_from = from;
       if ( transfer ) {
@@ -255,7 +194,7 @@ namespace eosiosystem {
 
       // update stake delegated from "from" to "receiver"
       {
-         del_bandwidth_table     del_tbl( _self, from.value );
+         del_bandwidth_table     del_tbl( get_self(), from.value );
          auto itr = del_tbl.find( receiver.value );
          if( itr == del_tbl.end() ) {
             itr = del_tbl.emplace( from, [&]( auto& dbo ){
@@ -284,7 +223,7 @@ namespace eosiosystem {
 
       // update totals of "receiver"
       {
-         user_resources_table   totals_tbl( _self, receiver.value );
+         user_resources_table   totals_tbl( get_self(), receiver.value );
          auto tot_itr = totals_tbl.find( receiver.value );
          if( tot_itr ==  totals_tbl.end() ) {
             tot_itr = totals_tbl.emplace( from, [&]( auto& tot ) {
@@ -318,9 +257,9 @@ namespace eosiosystem {
 
             if( !(net_managed && cpu_managed) ) {
                int64_t ram_bytes, net, cpu;
-               get_resource_limits( receiver.value, &ram_bytes, &net, &cpu );
+               get_resource_limits( receiver, ram_bytes, net, cpu );
 
-               set_resource_limits( receiver.value,
+               set_resource_limits( receiver,
                                     ram_managed ? ram_bytes : std::max( tot_itr->ram_bytes + ram_gift_bytes, ram_bytes ),
                                     net_managed ? net : tot_itr->net_weight.amount,
                                     cpu_managed ? cpu : tot_itr->cpu_weight.amount );
@@ -334,7 +273,7 @@ namespace eosiosystem {
 
       // create refund or update from existing refund
       if ( stake_account != source_stake_from ) { //for eosio both transfer and refund make no sense
-         refunds_table refunds_tbl( _self, from.value );
+         refunds_table refunds_tbl( get_self(), from.value );
          auto req = refunds_tbl.find( from.value );
 
          //create/update/delete refund
@@ -381,7 +320,7 @@ namespace eosiosystem {
                check( 0 <= req->net_amount.amount, "negative net refund amount" ); //should never happen
                check( 0 <= req->cpu_amount.amount, "negative cpu refund amount" ); //should never happen
                check( 0 <= req->vote_amount.amount, "negative vote refund amount" ); //should never happen
-               
+
                if ( req->is_empty() ) {
                   refunds_tbl.erase( req );
                   need_deferred_trx = false;
@@ -418,22 +357,20 @@ namespace eosiosystem {
          if ( need_deferred_trx ) {
             eosio::transaction out;
             out.actions.emplace_back( permission_level{from, active_permission},
-                                      _self, "refund"_n,
+                                      get_self(), "refund"_n,
                                       from
             );
             out.delay_sec = refund_delay_sec;
-            cancel_deferred( from.value ); // TODO: Remove this line when replacing deferred trxs is fixed
+            eosio::cancel_deferred( from.value ); // TODO: Remove this line when replacing deferred trxs is fixed
             out.send( from.value, from, true );
          } else {
-            cancel_deferred( from.value );
+            eosio::cancel_deferred( from.value );
          }
 
          auto transfer_amount = net_balance + cpu_balance + vote_balance;
          if ( 0 < transfer_amount.amount ) {
-            INLINE_ACTION_SENDER(eosio::token, transfer)(
-               token_account, { {source_stake_from, active_permission} },
-               { source_stake_from, stake_account, asset(transfer_amount), std::string("stake bandwidth") }
-            );
+            token::transfer_action transfer_act{ token_account, { {source_stake_from, active_permission} } };
+            transfer_act.send( source_stake_from, stake_account, asset(transfer_amount), "stake bandwidth" );
          }
       }
 
@@ -457,16 +394,20 @@ namespace eosiosystem {
 
       check( 0 <= voter_itr->staked, "stake for voting cannot be negative" );
 
+      ///@{
+      ///DAO: decrease active_stake when revoking votes
       if( voter_itr->is_active()) {
+         ///DAO: [cyb-352] active stake and max producer amount
          _gstate.active_stake += total_update.amount;
          update_votes( voter, voter_itr->proxy, voter_itr->producers, false );
       }
+      ///@}
    }
 
    void system_contract::delegatebw( name from, name receiver,
-                                     asset stake_net_quantity,
-                                     asset stake_cpu_quantity, 
-                                     asset stake_vote_quantity, 
+                                     const asset& stake_net_quantity,
+                                     const asset& stake_cpu_quantity,
+                                     const asset& stake_vote_quantity,
                                      bool transfer )
    {
       asset zero_asset( 0, core_symbol() );
@@ -475,42 +416,42 @@ namespace eosiosystem {
       check( stake_vote_quantity >= zero_asset, "must stake a positive amount" );
       check( stake_net_quantity.amount + stake_cpu_quantity.amount + stake_vote_quantity.amount > 0, "must stake a positive amount" );
       check( !transfer || from != receiver, "cannot use transfer flag if delegating to self" );
+      ///@{
+      ///DAO: [cyb-462] disallow vote delegation (#21)
       // vote delegation to receiver != from is disallowed because he cannot vote with it
       check( transfer || from == receiver || stake_vote_quantity == zero_asset, "vote can only be transfered or delegated to yourself");
+      ///@}
+
       changebw( from, receiver, stake_net_quantity, stake_cpu_quantity, stake_vote_quantity, transfer);
    } // delegatebw
 
    void system_contract::undelegatebw( name from, name receiver,
-                                       asset unstake_net_quantity, 
-                                       asset unstake_cpu_quantity,
-                                       asset unstake_vote_quantity )
+                                       const asset& unstake_net_quantity,
+                                       const asset& unstake_cpu_quantity,
+                                       const asset& unstake_vote_quantity )
    {
       asset zero_asset( 0, core_symbol() );
       check( unstake_cpu_quantity >= zero_asset, "must unstake a positive amount" );
       check( unstake_net_quantity >= zero_asset, "must unstake a positive amount" );
       check( unstake_vote_quantity >= zero_asset, "must unstake a positive amount" );
       check( unstake_cpu_quantity.amount + unstake_net_quantity.amount + unstake_vote_quantity.amount > 0, "must unstake a positive amount" );
-      check( _gstate.total_activated_stake >= min_activated_stake,
+      check( _gstate.thresh_activated_stake_time != time_point(),
              "cannot undelegate bandwidth until the chain is activated (at least 15% of all tokens participate in voting)" );
 
       changebw( from, receiver, -unstake_net_quantity, -unstake_cpu_quantity, -unstake_vote_quantity, false);
    } // undelegatebw
 
 
-   void system_contract::refund( const name owner ) {
+   void system_contract::refund( const name& owner ) {
       require_auth( owner );
 
-      refunds_table refunds_tbl( _self, owner.value );
+      refunds_table refunds_tbl( get_self(), owner.value );
       auto req = refunds_tbl.find( owner.value );
       check( req != refunds_tbl.end(), "refund request not found" );
       check( req->request_time + seconds(refund_delay_sec) <= current_time_point(),
              "refund is not available yet" );
-
-      INLINE_ACTION_SENDER(eosio::token, transfer)(
-         token_account, { {stake_account, active_permission}, {req->owner, active_permission} },
-         { stake_account, req->owner, req->net_amount + req->cpu_amount + req->vote_amount, std::string("unstake") }
-      );
-
+      token::transfer_action transfer_act{ token_account, { {stake_account, active_permission}, {req->owner, active_permission} } };
+      transfer_act.send( stake_account, req->owner, req->net_amount + req->cpu_amount + req->vote_amount, "unstake" );
       refunds_tbl.erase( req );
    }
 

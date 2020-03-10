@@ -27,7 +27,7 @@ The naming convention is codeaccount::actionname followed by a list of paramters
    - **proxy** the account registering as voter proxy (or unregistering)
    - **is_proxy** if true, proxy is registered; if false, proxy is unregistered
    - Storage change is billed to `proxy`.
-   
+
 ## eosio::delegatebw from receiver stake\_net\_quantity stake\_cpu\_quantity stake\_vote\_quantity transfer
    - **from** account holding tokens to be staked
    - **receiver** account to whose resources staked tokens are added

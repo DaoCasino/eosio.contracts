@@ -37,8 +37,8 @@ include(ExternalProject)
 find_package(eosio.cdt)
 message(STATUS "Package eosio.cdt found; EOSIO_CDT_ROOT = ${EOSIO_CDT_ROOT}")
 
-set(eosio_cdt_version_hard_min "1.5")
-set(eosio_cdt_version_soft_max "1.5")
+set(eosio_cdt_version_hard_min "1.6")
+set(eosio_cdt_version_soft_max "1.6")
 set(eosio_cdt_version_hard_max "")
 
 ### Check the version of eosio.cdt
@@ -62,12 +62,13 @@ else() # INVALID OR MISMATCH
     "requirements: ${version_match_error_msg}. Please use eosio.cdt version ${eosio_cdt_version_soft_max}.")
 endif()
 
+#TODO: Contracts' tests depend on different libraries for different build types:
+# libfc.a (for release) or libfc_debug.a (for debug) (the same for secp256k1 library).
+# (see EosioTester.cmake)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(TEST_BUILD_TYPE "Debug")
-  set(CMAKE_BUILD_TYPE "Release")
-else()
-  set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
+set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
 
 ExternalProject_Add(
   contracts_project
@@ -90,35 +91,45 @@ elseif (UNIX)
 endif()
 set(SECP256K1_ROOT "/usr/local")
 
-message(STATUS "Configuration:
-CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}
-TEST_BUILD_TYPE  = ${TEST_BUILD_TYPE}")
+message(STATUS "Configuration:")
+message(STATUS "  CMAKE_PREFIX_PATH = ${CMAKE_PREFIX_PATH}")
+message(STATUS "  CMAKE_BUILD_TYPE  = ${CMAKE_BUILD_TYPE}")
+message(STATUS "  TEST_BUILD_TYPE   = ${TEST_BUILD_TYPE}")
+message(STATUS "  OPENSSL_ROOT      = ${OPENSSL_ROOT}")
 
-string(REPLACE ";" "|" TEST_FRAMEWORK_PATH "${CMAKE_FRAMEWORK_PATH}")
-string(REPLACE ";" "|" TEST_MODULE_PATH "${CMAKE_MODULE_PATH}")
-ExternalProject_Add(
-  contracts_unit_tests
-  LIST_SEPARATOR | # Use the alternate list separator
-  CMAKE_ARGS
-    -DBOOST_ROOT=${BOOST_ROOT}
-    -DBoost_NO_SYSTEM_PATHS=${Boost_NO_SYSTEM_PATHS}
-    -DCMAKE_BUILD_TYPE=${TEST_BUILD_TYPE}
-    -DCMAKE_FRAMEWORK_PATH=${TEST_FRAMEWORK_PATH}
-    -DCMAKE_MODULE_PATH=${TEST_MODULE_PATH}
-    -DEOSIO_ROOT=${EOSIO_ROOT}
-    -DLLVM_DIR=${LLVM_DIR}
-    -Deosio_DIR=${CMAKE_MODULE_PATH}
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/tests
-  BINARY_DIR ${CMAKE_BINARY_DIR}/tests
-  TEST_COMMAND ""
-  INSTALL_COMMAND ""
-  BUILD_ALWAYS 1
-)
-add_dependencies(contracts_unit_tests contracts_project)
+set(BUILD_TESTS FALSE CACHE BOOL "Build unit tests")
+if(BUILD_TESTS)
+  string(REPLACE ";" "|" TEST_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
+  string(REPLACE ";" "|" TEST_FRAMEWORK_PATH "${CMAKE_FRAMEWORK_PATH}")
+  string(REPLACE ";" "|" TEST_MODULE_PATH "${CMAKE_MODULE_PATH}")
 
-add_custom_target(create_tar COMMAND
-  mkdir -p assets &&
-    tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='include' --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*'
-    -f "assets/contracts-${CONTRACTS_VER_DIRTY}.tar.gz" "contracts" --transform='s/contracts/contracts-${CONTRACTS_VER_DIRTY}/g'
-)
-add_dependencies(create_tar contracts_unit_tests)
+  ExternalProject_Add(
+    contracts_unit_tests
+    LIST_SEPARATOR | # Use the alternate list separator
+    CMAKE_ARGS
+      -DBOOST_ROOT=${BOOST_ROOT}
+      -DBoost_NO_SYSTEM_PATHS=${Boost_NO_SYSTEM_PATHS}
+      -DCMAKE_BUILD_TYPE=${TEST_BUILD_TYPE}
+      -DCMAKE_FRAMEWORK_PATH=${TEST_FRAMEWORK_PATH}
+      -DCMAKE_MODULE_PATH=${TEST_MODULE_PATH}
+      -DCMAKE_PREFIX_PATH=${TEST_PREFIX_PATH} #XXX: remove???
+      -DEOSIO_ROOT=${EOSIO_ROOT}
+      -DLLVM_DIR=${LLVM_DIR}
+      -Deosio_DIR=${CMAKE_MODULE_PATH}
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/tests
+    BINARY_DIR ${CMAKE_BINARY_DIR}/tests
+    TEST_COMMAND ""
+    INSTALL_COMMAND ""
+    BUILD_ALWAYS 1
+  )
+  add_dependencies(contracts_unit_tests contracts_project)
+
+  add_custom_target(create_tar COMMAND
+    mkdir -p assets &&
+      tar -C ${CMAKE_BINARY_DIR} -cvz --exclude='include' --exclude='*.cmake' --exclude='Makefile' --exclude='CMake*'
+      -f "assets/contracts-${CONTRACTS_VER_DIRTY}.tar.gz" "contracts" --transform='s/contracts/contracts-${CONTRACTS_VER_DIRTY}/g'
+  )
+  add_dependencies(create_tar contracts_unit_tests)
+else()
+  message(STATUS "Unit tests will not be built. To build unit tests, set BUILD_TESTS to true.")
+endif()
