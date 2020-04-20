@@ -1664,16 +1664,18 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
       for (uint32_t i = 0; i < 21; ++i) {
          if (0 == get_producer_info(producer_names[i])["unpaid_blocks"].as<uint32_t>()) {
             all_21_produced = false;
-            std::cout << producer_names[i] << "\n";
+            BOOST_TEST_MESSAGE(i << "-th producer should produce");
          }
       }
       bool rest_didnt_produce = true;
       for (uint32_t i = 21; i < producer_names.size(); ++i) {
          if (0 < get_producer_info(producer_names[i])["unpaid_blocks"].as<uint32_t>()) {
             rest_didnt_produce = false;
+            BOOST_TEST_MESSAGE(i << "-th producer should not produce");
          }
       }
-      BOOST_REQUIRE(all_21_produced && rest_didnt_produce);
+      BOOST_REQUIRE_EQUAL(all_21_produced, true);
+      BOOST_REQUIRE_EQUAL(rest_didnt_produce, true);
    }
 
    std::vector<double> vote_shares(producer_names.size());
@@ -4015,6 +4017,8 @@ BOOST_FIXTURE_TEST_CASE( stake_validators_correlation, eosio_system_tester ) try
    BOOST_TEST_MESSAGE("state: " << variant_to_string(get_global_state()));
    BOOST_TEST_MESSAGE("active stake = " << get_global_state()["active_stake"].as<int64_t>() <<
                       "; total stake = " << get_token_supply().to_string());
+
+   BOOST_TEST_MESSAGE("XXX: active schedule size = " << control->head_block_state()->active_schedule.producers.size());
 
 } FC_LOG_AND_RETHROW()
 

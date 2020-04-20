@@ -65,10 +65,11 @@ endif()
 #TODO: Contracts' tests depend on different libraries for different build types:
 # libfc.a (for release) or libfc_debug.a (for debug) (the same for secp256k1 library).
 # (see EosioTester.cmake)
+set(TEST_BUILD_TYPE RelWithDebInfo)
+#~set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
-set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE})
 
 ExternalProject_Add(
   contracts_project

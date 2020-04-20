@@ -4,9 +4,9 @@ default: help
 help:
 	@echo "Targets:"
 	@echo
-	@echo "  tags -- regerate tags via ctags"
+	@echo "  tags : generate tags file via ctags"
 
 
 .PHONY: tags
 tags:
-	ctags -R .
+	ctags -R --exclude=build .

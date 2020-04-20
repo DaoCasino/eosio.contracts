@@ -67,7 +67,7 @@ namespace eosiosystem {
    static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day; // half seconds per day
    static constexpr uint32_t blocks_per_hour       = 2 * 3600;
 
-   static constexpr int64_t  min_activated_stake   = 25'090'624'0000; ///< DAO: Total supply = 167,270,821 BET
+   static constexpr int64_t  min_activated_stake   = 25'090'624'0000;      ///< DAO: Total supply = 167'270'821 BET
    static constexpr int64_t  ram_gift_bytes        = 1400;
    static constexpr int64_t  min_pervote_daily_pay = 100'0000;
    static constexpr uint32_t refund_delay_sec      = 14 * seconds_per_day; ///< DAO: stake lock up period = 2 weeks
@@ -125,17 +125,23 @@ namespace eosiosystem {
       time_point           last_pervote_bucket_fill;
       int64_t              pervote_bucket = 0;
       int64_t              perblock_bucket = 0;
-      uint32_t             total_unpaid_blocks = 0;                 /// all blocks which have been produced but not paid
-      int64_t              total_activated_stake = 0;               /// last active_stake value after reaching min_activated_stake
-      int64_t              active_stake = 0;                        /// current total activated stake
-      time_point           thresh_activated_stake_time;             /// timepoint when min_activated_stake is reached
-      uint16_t             target_producer_schedule_size = 21;
+      uint32_t             total_unpaid_blocks = 0;            ///< all blocks which have been produced but not paid
+      int64_t              total_activated_stake = 0;          ///< last active_stake value after reaching min_activated_stake
+      int64_t              active_stake = 0;                   ///< current total activated stake
+      time_point           thresh_activated_stake_time;        ///< timepoint when min_activated_stake is reached
+      uint16_t             target_producer_schedule_size = 21; ///< current maximal number of active BPs
       uint16_t             last_producer_schedule_size = 0;
-      double               total_producer_vote_weight = 0;          /// the sum of all producer votes
+      double               total_producer_vote_weight = 0;     ///< the sum of all producer votes
       block_timestamp      last_name_close;
-      block_timestamp      last_target_schedule_size_update;        /// ts of last producers schedule update
-      uint32_t             schedule_update_interval = 60 * 60 * 24; /// min interval between changes in producer schedule
-      uint16_t             schedule_size_step = 3;
+
+      ///@{
+      /// @deprecated unused since 1.8
+      /// See eosio_global_state4 unstead.
+      block_timestamp      last_target_schedule_size_update;        ///< ts of last producers schedule update
+      uint32_t             schedule_update_interval = 60 * 60 * 24; ///< min interval between changes in producer schedule
+      ///@}
+
+      uint16_t             schedule_size_step = 3;             ///< schedule size change step
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
       EOSLIB_SERIALIZE_DERIVED( eosio_global_state, eosio::blockchain_parameters,
@@ -167,6 +173,21 @@ namespace eosiosystem {
       double            total_vpay_share_change_rate = 0;
 
       EOSLIB_SERIALIZE( eosio_global_state3, (last_vpay_state_update)(total_vpay_share_change_rate) )
+   };
+
+   /// Defines new global state parameters for DAOBet added since version 1.8.
+   struct [[eosio::table("global4"), eosio::contract("eosio.system")]] eosio_global_state4 {
+      eosio_global_state4() {}
+
+      block_timestamp last_schedule_size_decrease; ///< last producers schedule decrease time
+      block_timestamp last_schedule_size_increase; ///< last producers schedule increase time
+
+      uint32_t schedule_decrease_delay_sec = seconds_per_day;  ///< min interval (seconds) before next producer schedule size decrease
+      uint32_t schedule_increase_delay_sec = seconds_per_year; ///< min interval (seconds) before next producer schedule size increase
+
+      EOSLIB_SERIALIZE( eosio_global_state4,
+         (last_schedule_size_decrease)(last_schedule_size_increase)
+         (schedule_decrease_delay_sec)(schedule_increase_delay_sec) )
    };
 
    // Defines `producer_info` structure to be stored in `producer_info` table, added after version 1.0
@@ -265,6 +286,8 @@ namespace eosiosystem {
 
    typedef eosio::singleton< "global3"_n, eosio_global_state3 > global_state3_singleton;
 
+   typedef eosio::singleton< "global4"_n, eosio_global_state4 > global_state4_singleton;
+
    typedef eosio::singleton< "version"_n, version_info >        contracts_version_singleton;
 
    struct [[eosio::table, eosio::contract("eosio.system")]] user_resources {
@@ -344,9 +367,11 @@ namespace eosiosystem {
          global_state_singleton      _global;
          global_state2_singleton     _global2;
          global_state3_singleton     _global3;
+         global_state4_singleton     _global4;
          eosio_global_state          _gstate;
          eosio_global_state2         _gstate2;
          eosio_global_state3         _gstate3;
+         eosio_global_state4         _gstate4;
          rammarket                   _rammarket;
          contracts_version_singleton _contracts_version;
 #ifndef NDEBUG
