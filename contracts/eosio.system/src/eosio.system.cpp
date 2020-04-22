@@ -19,6 +19,7 @@ namespace eosiosystem {
       , _global(get_self(), get_self().value)
       , _global2(get_self(), get_self().value)
       , _global3(get_self(), get_self().value)
+      , _global4(get_self(), get_self().value)
       , _rammarket(get_self(), get_self().value)
       , _contracts_version(get_self(), get_self().value)
 #ifndef NDEBUG
@@ -28,6 +29,7 @@ namespace eosiosystem {
       _gstate  = _global.exists() ? _global.get() : get_default_parameters();
       _gstate2 = _global2.exists() ? _global2.get() : eosio_global_state2{};
       _gstate3 = _global3.exists() ? _global3.get() : eosio_global_state3{};
+      _gstate4 = _global4.exists() ? _global4.get() : eosio_global_state4{};
       _contracts_version.set(version_info{CONTRACTS_VERSION}, get_self());
 #ifndef NDEBUG
       _dlogs = _dlogs_singleton.exists() ? _dlogs_singleton.get() : dlogs{};
@@ -49,6 +51,7 @@ namespace eosiosystem {
       _global.set( _gstate, get_self() );
       _global2.set( _gstate2, get_self() );
       _global3.set( _gstate3, get_self() );
+      _global4.set( _gstate4, get_self() );
 #ifndef NDEBUG
       _dlogs_singleton.set(_dlogs, get_self());
 #endif

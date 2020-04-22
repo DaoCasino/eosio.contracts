@@ -539,21 +539,24 @@ public:
       return static_cast<uint64_t>( time_point::from_iso_string( v.as_string() ).time_since_epoch().count() );
    }
 
-   fc::variant get_global_state() const {
-      vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(global), N(global) );
-      if (data.empty()) std::cout << "\nData is empty\n" << std::endl;
-      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "eosio_global_state", data, abi_serializer_max_time );
+#define GET_GLOBAL_STATE_FUNC(function, account, abi_type) \
+   fc::variant function() const { \
+      vector<char> data = \
+         get_row_by_account( config::system_account_name, config::system_account_name, N(account), N(account) ); \
+      if (data.empty()) { \
+         std::cout << "\nData is empty\n"; \
+      } \
+      return data.empty() \
+         ? fc::variant() \
+         : abi_ser.binary_to_variant( #abi_type, data, abi_serializer_max_time ); \
    }
 
-   fc::variant get_global_state2() {
-      vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(global2), N(global2) );
-      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "eosio_global_state2", data, abi_serializer_max_time );
-   }
+   GET_GLOBAL_STATE_FUNC(get_global_state,  global,  eosio_global_state)
+   GET_GLOBAL_STATE_FUNC(get_global_state2, global2, eosio_global_state2)
+   GET_GLOBAL_STATE_FUNC(get_global_state3, global3, eosio_global_state3)
+   GET_GLOBAL_STATE_FUNC(get_global_state4, global4, eosio_global_state4)
 
-   fc::variant get_global_state3() {
-      vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(global3), N(global3) );
-      return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "eosio_global_state3", data, abi_serializer_max_time );
-   }
+#undef GET_GLOBAL_STATE_FUNC
 
    fc::variant get_refund_request( name account ) {
       vector<char> data = get_row_by_account( config::system_account_name, account, N(refunds), account );

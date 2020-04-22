@@ -74,11 +74,11 @@ namespace eosiosystem {
       });
    }
 
-   int32_t get_target_amount(int32_t activated_share) {
+   int32_t get_target_schedule_size(int32_t activated_share) {
       if (activated_share <= 33) {
-        return 21;
+         return 21;
       } else if (activated_share > 33 && activated_share < 60) {
-        return 21 + (activated_share - 33) * 3;
+         return 21 + (activated_share - 33) * 3;
       }
       return 102;
    }
@@ -86,28 +86,40 @@ namespace eosiosystem {
    void system_contract::update_elected_producers( const block_timestamp& block_time ) {
       _gstate.last_producer_schedule_update = block_time;
 
-      auto idx = _producers.get_index<"prototalvote"_n>();
-
       std::vector< std::pair<eosio::producer_key,uint16_t> > top_producers;
       const asset token_supply = eosio::token::get_supply(token_account, core_symbol().code() );
       const int32_t activated_share = 100 * _gstate.active_stake / token_supply.amount;
       int32_t target_schedule_size = _gstate.target_producer_schedule_size;
 
-      // update target every 24 hours
-      if (block_time.slot - _gstate.last_target_schedule_size_update.slot >= 2 * _gstate.schedule_update_interval) {
-        int32_t target_amount = get_target_amount(activated_share);
-        if (target_amount > target_schedule_size) {
-          target_schedule_size = target_schedule_size + _gstate.schedule_size_step;
-        } else if (target_amount < target_schedule_size) {
-          target_schedule_size = target_schedule_size - _gstate.schedule_size_step;
-        }
-        _gstate.last_target_schedule_size_update = block_time;
-        _gstate.target_producer_schedule_size = target_schedule_size;
+      const int32_t new_target_schedule_size = get_target_schedule_size(activated_share);
+
+      // try to decrease schedule size every schedule_decrease_delay_sec seconds
+      if (block_time.slot - _gstate4.last_schedule_size_decrease.slot >= 2 * _gstate4.schedule_decrease_delay_sec) {
+         if (new_target_schedule_size < target_schedule_size) { // decrease delay check is in the outer condition
+            target_schedule_size -= _gstate.schedule_size_step;
+            _gstate.target_producer_schedule_size = new_target_schedule_size;
+         }
+         // perform decrease attempts only once per given delay
+         _gstate4.last_schedule_size_decrease = block_time;
+      }
+
+      // try to increase schedule size every schedule_increase_delay_sec seconds
+      if (block_time.slot - _gstate4.last_schedule_size_increase.slot >= 2 * _gstate4.schedule_increase_delay_sec) {
+         if (new_target_schedule_size > target_schedule_size) {
+            target_schedule_size += _gstate.schedule_size_step;
+            _gstate.target_producer_schedule_size = new_target_schedule_size;
+         }
+
+         // perform increase attempts only once per given delay
+         _gstate4.last_schedule_size_increase = block_time;
       }
 
       top_producers.reserve(target_schedule_size);
 
-      for ( auto it = idx.cbegin(); it != idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active(); ++it ) {
+      auto prods_by_votes_idx = _producers.get_index<"prototalvote"_n>();
+      for ( auto it = prods_by_votes_idx.cbegin();
+            it != prods_by_votes_idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active();
+            ++it ) {
          ADD_DEBUG_LOG_MSG("adding producer: " + it->owner.to_string());
          del_bandwidth_table del_tbl( get_self(), it->owner.value );
          auto itr = del_tbl.find( it->owner.value );
@@ -130,8 +142,9 @@ namespace eosiosystem {
       std::vector<eosio::producer_key> producers;
 
       producers.reserve(top_producers.size());
-      for( const auto& item : top_producers )
+      for( const auto& item : top_producers ) {
          producers.push_back(item.first);
+      }
 
       if( set_proposed_producers( producers ) >= 0 ) {
          _gstate.last_producer_schedule_size = static_cast<decltype(_gstate.last_producer_schedule_size)>( top_producers.size() );
