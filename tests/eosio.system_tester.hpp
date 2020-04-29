@@ -249,8 +249,8 @@ public:
 
    transaction_trace_ptr setup_producer_accounts( const std::vector<account_name>& accounts,
                                                   asset ram = STRSYM("1.0000"),
-                                                  asset cpu = STRSYM("80.0000"),
-                                                  asset net = STRSYM("80.0000"),
+                                                  asset cpu = STRSYM("15000.0000"), // min_producer_activated_stake / 2
+                                                  asset net = STRSYM("15000.0000"), // min_producer_activated_stake / 2
                                                   asset vote = STRSYM("0.0000")
                                                 )
    {

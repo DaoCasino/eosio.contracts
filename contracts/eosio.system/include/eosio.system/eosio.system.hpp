@@ -64,15 +64,15 @@ namespace eosiosystem {
    static constexpr int64_t  useconds_per_year     = int64_t(seconds_per_year) * 1000'000ll;
    static constexpr int64_t  useconds_per_day      = int64_t(seconds_per_day) * 1000'000ll;
    static constexpr int64_t  useconds_per_hour     = int64_t(seconds_per_hour) * 1000'000ll;
-   static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day; // half seconds per day
+   static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day;  ///< half seconds per day
    static constexpr uint32_t blocks_per_hour       = 2 * 3600;
 
-   static constexpr int64_t  min_activated_stake   = 25'090'624'0000;      ///< DAO: Total supply = 167'270'821 BET
+   static constexpr int64_t  min_activated_stake   = 25'090'624'0000;      ///< DAO: total supply is 167'270'821 BET
    static constexpr int64_t  ram_gift_bytes        = 1400;
    static constexpr int64_t  min_pervote_daily_pay = 100'0000;
    static constexpr uint32_t refund_delay_sec      = 14 * seconds_per_day; ///< DAO: stake lock up period = 2 weeks
 
-   static constexpr double   min_producer_activated_share = 0;
+   static constexpr int64_t  min_producer_activated_stake = 30'000'0000;   ///< minimum activated stake
 
    /**
     * eosio.system contract defines the structures and actions needed for blockchain's core functionality.
@@ -269,9 +269,7 @@ namespace eosiosystem {
    };
 
 
-
    typedef eosio::multi_index< "voters"_n, voter_info >  voters_table;
-
 
    typedef eosio::multi_index< "producers"_n, producer_info,
                                indexed_by<"prototalvote"_n, const_mem_fun<producer_info, double, &producer_info::by_votes>  >
@@ -626,12 +624,12 @@ namespace eosiosystem {
          /**
           * Vote producer action. Votes for a set of producers. This action updates the list of `producers` voted for,
           * for `voter` account. If voting for a `proxy`, the producer votes will not change until the
-          * proxy updates their own vote. Voter can vote for a proxy __or__ a list of at most 30 producers.
+          * proxy updates their own vote. Voter can vote for a proxy __or__ a list of at most 1 producer.
           * Storage change is billed to `voter`.
           *
           * @param voter - the account to change the voted producers for,
           * @param proxy - the proxy to change the voted producers for,
-          * @param producers - the list of producers to vote for, a maximum of 30 producers is allowed.
+          * @param producers - the list of producers to vote for, a maximum of 1 producer is allowed.
           *
           * @pre Producers must be sorted from lowest to highest and must be registered and active
           * @pre If proxy is set then no producers can be voted for
