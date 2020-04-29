@@ -115,20 +115,31 @@ namespace eosiosystem {
       }
 
       top_producers.reserve(target_schedule_size);
+      ADD_DEBUG_LOG_MSG("top producers list size = " + std::to_string(target_schedule_size));
 
       auto prods_by_votes_idx = _producers.get_index<"prototalvote"_n>();
       for ( auto it = prods_by_votes_idx.cbegin();
             it != prods_by_votes_idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active();
             ++it ) {
          ADD_DEBUG_LOG_MSG("adding producer: " + it->owner.to_string());
+
+         asset total_staked(0, core_symbol());
+         // get only own total stake here (i.e. that one producer voted for himself)
          del_bandwidth_table del_tbl( get_self(), it->owner.value );
          auto itr = del_tbl.find( it->owner.value );
-         asset total_staked(0, core_symbol());
          if (itr != del_tbl.end()) {
             total_staked = itr->net_weight + itr->cpu_weight + itr->vote_weight;
          }
-         // producer has to stake at least min_producer_activated_share of the supply
-         if (total_staked.amount >= min_producer_activated_share * token_supply.amount) {
+         // count stake from other voters
+         user_resources_table userres_tbl(get_self(), it->owner.value);
+         const auto userres_it = userres_tbl.find(it->owner.value);
+         if (userres_it != userres_tbl.end()) {
+            total_staked += userres_it->net_weight + userres_it->cpu_weight + userres_it->vote_weight;
+         }
+         ADD_DEBUG_LOG_MSG("total_staked: " + std::to_string(total_staked.amount));
+
+         // producer has to stake at least min_producer_activated_stake tokens
+         if (total_staked.amount >= min_producer_activated_stake) {
             top_producers.emplace_back( std::pair<eosio::producer_key,uint16_t>({{it->owner, it->producer_key}, it->location}) );
          }
       }

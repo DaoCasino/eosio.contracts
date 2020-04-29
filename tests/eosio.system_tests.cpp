@@ -22,6 +22,18 @@
 //   ./cicd/build.sh --build-tests --build-type Debug && \
 //      ./build/tests/unit_test -l all -r detailed -t eosio_system_tests/stake_validators_correlation -- --verbose ; echo $?
 
+static constexpr uint32_t seconds_per_year      = 52 * 7 * 24 * 3600;
+static constexpr uint32_t seconds_per_day       = 24 * 3600;
+static constexpr uint32_t seconds_per_hour      = 3600;
+static constexpr int64_t  useconds_per_year     = int64_t(seconds_per_year) * 1000'000ll;
+static constexpr int64_t  useconds_per_day      = int64_t(seconds_per_day) * 1000'000ll;
+static constexpr int64_t  useconds_per_hour     = int64_t(seconds_per_hour) * 1000'000ll;
+static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day; // half seconds per day
+static constexpr uint32_t blocks_per_hour       = 2 * 3600;
+
+static constexpr int64_t  min_producer_activated_stake = 30'000'0000;
+
+
 struct _abi_hash {
    name owner;
    fc::sha256 hash;
@@ -54,7 +66,6 @@ static double get_target_emission_per_year(double activated_share) {
 }
 
 static double get_continuous_rate(double emission_rate) {
-   static const uint32_t blocks_per_hour = 2 * 3600;
    return (pow(1 + emission_rate, 1./blocks_per_hour) - 1) * blocks_per_hour;
 }
 
@@ -1353,10 +1364,8 @@ BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test
 
 
 BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::tolerance(1e-2)) try {
-   const double usecs_per_year  = 52 * 7 * 24 * 3600 * 1000000ll;
-   const double secs_per_year   = 52 * 7 * 24 * 3600;
 
-   const asset large_asset = STRSYM("80.0000");
+   const asset large_asset = core_sym::from_int(min_producer_activated_stake / 2);
    create_account_with_resources( N(defproducera), config::system_account_name, STRSYM("1.0000"), false, large_asset, large_asset );
    create_account_with_resources( N(defproducerb), config::system_account_name, STRSYM("1.0000"), false, large_asset, large_asset );
    create_account_with_resources( N(defproducerc), config::system_account_name, STRSYM("1.0000"), false, large_asset, large_asset );
@@ -1366,7 +1375,9 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
 
    BOOST_REQUIRE_EQUAL(success(), regproducer(N(defproducera)));
    produce_block(fc::hours(24));
+
    auto prod = get_producer_info( N(defproducera) );
+   std::cout << "defproducera info = " << prod << '\n';
    BOOST_REQUIRE_EQUAL("defproducera", prod["owner"].as_string());
    BOOST_REQUIRE_EQUAL(0, prod["total_votes"].as_double());
 
@@ -1376,6 +1387,7 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
    BOOST_REQUIRE_EQUAL(success(), stake("producvotera", STRSYM("10.0000"), STRSYM("10.0000"), STRSYM("30000000.0000")));
    BOOST_REQUIRE_EQUAL(success(), vote( N(producvotera), { N(defproducera) }));
    ///@}
+
    // defproducera is the only active producer
    // produce enough blocks so new schedule kicks in and defproducera produces some blocks
    {
@@ -1387,6 +1399,10 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
       const int64_t  initial_perblock_bucket   = initial_global_state["perblock_bucket"].as<int64_t>();
       const int64_t  initial_dao               = get_balance(N(eosio.saving)).get_amount(); // DAOBET
       const uint32_t initial_tot_unpaid_blocks = initial_global_state["total_unpaid_blocks"].as<uint32_t>();
+
+      std::cout << "global_state = " << initial_global_state << '\n';
+      std::cout << "defproducera info = " << get_producer_info( N(defproducera) ) << '\n';
+      print_debug_logs();
 
       prod = get_producer_info("defproducera");
       const uint32_t unpaid_blocks = prod["unpaid_blocks"].as<uint32_t>();
@@ -1425,16 +1441,16 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
 
       auto minted = supply.get_amount() - initial_supply.get_amount();
 
-      BOOST_REQUIRE_EQUAL(int64_t( ( initial_supply.get_amount() * double(secs_between_fills) * continuous_rate ) / secs_per_year ),
+      BOOST_REQUIRE_EQUAL(int64_t( ( initial_supply.get_amount() * double(secs_between_fills) * continuous_rate ) / seconds_per_year ),
                           supply.get_amount() - initial_supply.get_amount());
       ///@{
       ///DAOBET
-      BOOST_REQUIRE_EQUAL(int64_t( ( initial_supply.get_amount() * double(secs_between_fills) * (continuous_rate * 1 / 5.) / secs_per_year ) ),
+      BOOST_REQUIRE_EQUAL(int64_t( ( initial_supply.get_amount() * double(secs_between_fills) * (continuous_rate * 1 / 5.) / seconds_per_year ) ),
                           dao - initial_dao);
-      BOOST_REQUIRE_EQUAL(int64_t( ( initial_supply.get_amount() * double(secs_between_fills) * (continuous_rate * 4 / 5. * 0.25) / secs_per_year ) ),
+      BOOST_REQUIRE_EQUAL(int64_t( ( initial_supply.get_amount() * double(secs_between_fills) * (continuous_rate * 4 / 5. * 0.25) / seconds_per_year ) ),
                           balance.get_amount() - initial_balance.get_amount());
 
-      auto to_dao = int64_t ( initial_supply.get_amount() * double(secs_between_fills) * (continuous_rate * 1 / 5.) / secs_per_year );
+      auto to_dao = int64_t ( initial_supply.get_amount() * double(secs_between_fills) * (continuous_rate * 1 / 5.) / seconds_per_year );
       auto to_producers = minted - to_dao;
       ///@}
 
@@ -1511,7 +1527,7 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
 
       ///@{
       ///DAOBET
-      BOOST_REQUIRE_EQUAL(int64_t( ( double(initial_supply.get_amount()) * double(usecs_between_fills) * continuous_rate / usecs_per_year ) ),
+      BOOST_REQUIRE_EQUAL(int64_t( ( double(initial_supply.get_amount()) * double(usecs_between_fills) * continuous_rate / useconds_per_year ) ),
                           supply.get_amount() - initial_supply.get_amount());
       BOOST_REQUIRE_EQUAL( (supply.get_amount() - initial_supply.get_amount()) / 5,
                           to_dao);
@@ -1564,9 +1580,6 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
 
 
 BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::unit_test::tolerance(1e-10)) try {
-
-   const int64_t secs_per_year  = 52 * 7 * 24 * 3600;
-   const double  usecs_per_year = secs_per_year * 1000000;
 
    const asset net = STRSYM("80.0000");
    const asset cpu = STRSYM("80.0000");
@@ -1759,7 +1772,7 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
       const int32_t secs_between_fills = static_cast<int32_t>(usecs_between_fills / 1'000'000);
       BOOST_TEST_MESSAGE("seconds between claims = " << secs_between_fills);
 
-      const double expected_supply_growth = initial_supply.get_amount() * double(usecs_between_fills) * continuous_rate / usecs_per_year; // DAOBET
+      const double expected_supply_growth = initial_supply.get_amount() * double(usecs_between_fills) * continuous_rate / useconds_per_year; // DAOBET
       BOOST_REQUIRE_EQUAL( int64_t(expected_supply_growth), supply.get_amount() - initial_supply.get_amount() );
 
       //TODO: also check changing emission rate after unstaking (when active_stake is decreased)
@@ -2864,17 +2877,25 @@ BOOST_FIXTURE_TEST_CASE( proxy_cannot_use_another_proxy, eosio_system_tester ) t
 
 
 BOOST_FIXTURE_TEST_CASE( elect_producers /*_and_parameters*/, eosio_system_tester ) try {
+
    create_accounts_with_resources( {  N(defproducer1), N(defproducer2), N(defproducer3) } );
+
    BOOST_REQUIRE_EQUAL( success(), regproducer( "defproducer1" ) );
    BOOST_REQUIRE_EQUAL( success(), regproducer( "defproducer2" ) );
    BOOST_REQUIRE_EQUAL( success(), regproducer( "defproducer3" ) );
 
+   const asset min_prod_stake = core_sym::from_int(min_producer_activated_stake);
+   const asset half_min_prod_stake = core_sym::from_int(min_producer_activated_stake/2);
+
    //stake more than 15% of total supply to activate chain
-   transfer( "eosio", "alice1111111", STRSYM("30000200.0000"), "eosio" );
+   transfer( "eosio", "alice1111111", STRSYM("30000200.0000") + min_prod_stake, "eosio" );
    BOOST_REQUIRE_EQUAL( success(), stake( "alice1111111", STRSYM("100.0000"), STRSYM("100.0000"), STRSYM("30000000.0000") ) );
+   // stake for defproducer1 to reach min_producer_activated_stake
+   BOOST_REQUIRE_EQUAL( success(), stake( "alice1111111", "defproducer1", half_min_prod_stake, half_min_prod_stake, STRSYM("0.0000") ) );
    //vote for producers
    BOOST_REQUIRE_EQUAL( success(), vote( N(alice1111111), { N(defproducer1) } ) );
    produce_blocks(250);
+
    auto producer_keys = control->head_block_state()->active_schedule.producers;
    BOOST_REQUIRE_EQUAL( 1, producer_keys.size() );
    BOOST_REQUIRE_EQUAL( name("defproducer1"), producer_keys[0].producer_name );
@@ -2884,9 +2905,10 @@ BOOST_FIXTURE_TEST_CASE( elect_producers /*_and_parameters*/, eosio_system_teste
    //REQUIRE_EQUAL_OBJECTS(prod1_config, config);
 
    // elect 2 producers
-   issue_and_transfer( "bob111111111", STRSYM("80200.0000"),  config::system_account_name );
+   issue_and_transfer( "bob111111111", STRSYM("80200.0000") + min_prod_stake, config::system_account_name );
    ilog("stake");
    BOOST_REQUIRE_EQUAL( success(), stake( "bob111111111", STRSYM("100.0000"), STRSYM("100.0000"), STRSYM("80000.0000") ) );
+   BOOST_REQUIRE_EQUAL( success(), stake( "bob111111111", "defproducer2", half_min_prod_stake, half_min_prod_stake, STRSYM("0.0000") ) );
    ilog("start vote");
    BOOST_REQUIRE_EQUAL( success(), vote( N(bob111111111), { N(defproducer2) } ) );
    ilog(".");
@@ -2900,7 +2922,8 @@ BOOST_FIXTURE_TEST_CASE( elect_producers /*_and_parameters*/, eosio_system_teste
    //REQUIRE_EQUAL_OBJECTS(prod2_config, config);
 
    // elect 3 producers
-   issue_and_transfer( N(defproducer3), STRSYM("80200.0000"),  config::system_account_name );
+   issue_and_transfer( N(defproducer3), STRSYM("80200.0000"), config::system_account_name );
+   // total defproducer3 stake > min_producer_activated_stake
    BOOST_REQUIRE_EQUAL( success(), stake( N(defproducer3), STRSYM("100.0000"), STRSYM("100.0000"), STRSYM("80000.0000") ) );
    BOOST_REQUIRE_EQUAL( success(), vote( N(defproducer3), { N(defproducer3) } ) );
    produce_blocks(250);
@@ -2923,7 +2946,7 @@ BOOST_FIXTURE_TEST_CASE( elect_producers /*_and_parameters*/, eosio_system_teste
    wdump((get_producer_info("defproducer1")));
    wdump((get_producer_info("defproducer2")));
    wdump((get_producer_info("defproducer3")));
-   print_debug_logs();
+   //~print_debug_logs();
    BOOST_TEST_MESSAGE("gstate.last_producer_schedule_size = " << get_global_state()["last_producer_schedule_size"].as<uint16_t>());
 
    producer_keys = control->head_block_state()->active_schedule.producers;
