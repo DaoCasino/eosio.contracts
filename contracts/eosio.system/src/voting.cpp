@@ -121,8 +121,6 @@ namespace eosiosystem {
       for ( auto it = prods_by_votes_idx.cbegin();
             it != prods_by_votes_idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active();
             ++it ) {
-         ADD_DEBUG_LOG_MSG("adding producer: " + it->owner.to_string());
-
          asset total_staked(0, core_symbol());
          // get only own total stake here (i.e. that one producer voted for himself)
          del_bandwidth_table del_tbl( get_self(), it->owner.value );
@@ -136,10 +134,11 @@ namespace eosiosystem {
          if (userres_it != userres_tbl.end()) {
             total_staked += userres_it->net_weight + userres_it->cpu_weight + userres_it->vote_weight;
          }
-         ADD_DEBUG_LOG_MSG("total_staked: " + std::to_string(total_staked.amount));
+         ADD_DEBUG_LOG_MSG(it->owner.to_string() + " total staked: " + std::to_string(total_staked.amount));
 
          // producer has to stake at least min_producer_activated_stake tokens
          if (total_staked.amount >= min_producer_activated_stake) {
+            ADD_DEBUG_LOG_MSG("added " + it->owner.to_string() + " to schedule");
             top_producers.emplace_back( std::pair<eosio::producer_key,uint16_t>({{it->owner, it->producer_key}, it->location}) );
          }
       }

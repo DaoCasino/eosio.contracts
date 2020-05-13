@@ -44,6 +44,8 @@ namespace eosio_system {
 class eosio_system_tester : public TESTER {
 public:
 
+   static constexpr int64_t min_producer_activated_stake = 30'000'0000;
+
    enum class setup_level {
       none,
       minimal,
