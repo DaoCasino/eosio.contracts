@@ -20,7 +20,7 @@
 //XXX: run tests with --log_level=message (or below) to see BOOST_TEST_MESSAGE output
 // e.g.:
 //   ./cicd/build.sh --build-tests --build-type Debug && \
-//      ./build/tests/unit_test -l all -r detailed -t eosio_system_tests/stake_validators_correlation -- --verbose ; echo $?
+//      ./build/tests/unit_test -p -l all -r detailed -t eosio_system_tests/stake_validators_correlation -- --verbose ; echo $?
 
 static constexpr uint32_t seconds_per_year      = 52 * 7 * 24 * 3600;
 static constexpr uint32_t seconds_per_day       = 24 * 3600;
@@ -31,8 +31,7 @@ static constexpr int64_t  useconds_per_hour     = int64_t(seconds_per_hour) * 10
 static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day; // half seconds per day
 static constexpr uint32_t blocks_per_hour       = 2 * 3600;
 
-static constexpr int64_t  min_producer_activated_stake = 30'000'0000;
-
+static constexpr int64_t min_producer_activated_stake = 30'000'0000;
 
 struct _abi_hash {
    name owner;
@@ -1377,7 +1376,7 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
    produce_block(fc::hours(24));
 
    auto prod = get_producer_info( N(defproducera) );
-   std::cout << "defproducera info = " << prod << '\n';
+   wdump((prod));
    BOOST_REQUIRE_EQUAL("defproducera", prod["owner"].as_string());
    BOOST_REQUIRE_EQUAL(0, prod["total_votes"].as_double());
 
@@ -1400,8 +1399,8 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
       const int64_t  initial_dao               = get_balance(N(eosio.saving)).get_amount(); // DAOBET
       const uint32_t initial_tot_unpaid_blocks = initial_global_state["total_unpaid_blocks"].as<uint32_t>();
 
-      std::cout << "global_state = " << initial_global_state << '\n';
-      std::cout << "defproducera info = " << get_producer_info( N(defproducera) ) << '\n';
+      wdump((initial_global_state));
+      wdump((get_producer_info(N(defproducera))));
       print_debug_logs();
 
       prod = get_producer_info("defproducera");
@@ -3238,14 +3237,14 @@ BOOST_FIXTURE_TEST_CASE( vote_producers_in_and_out, eosio_system_tester ) try {
       for (uint32_t i = 0; i < 21; ++i) {
          if (0 == get_producer_info(producer_names[i])["unpaid_blocks"].as<uint32_t>()) {
             all_21_produced = false;
-            std::cout << "prod: " << get_producer_info(producer_names[i]) << "\n";
+            wdump((get_producer_info(producer_names[i])));
          }
       }
       bool rest_didnt_produce = true;
       for (uint32_t i = 21; i < producer_names.size(); ++i) {
          if (0 < get_producer_info(producer_names[i])["unpaid_blocks"].as<uint32_t>()) {
             rest_didnt_produce = false;
-            std::cout << "prod: " << get_producer_info(producer_names[i]) << "\n";
+            wdump((get_producer_info(producer_names[i])));
          }
       }
       BOOST_REQUIRE(all_21_produced && rest_didnt_produce);
@@ -3721,7 +3720,6 @@ BOOST_FIXTURE_TEST_CASE( buy_pin_sell_ram, eosio_system_tester ) try {
    auto total_res = get_total_stake( "eosio" );
 
    BOOST_TEST_MESSAGE("eosio total ram stake = " << total_res["ram_bytes"].as_int64());
-   //std::cerr << get_global_state() << '\n';
 
    REQUIRE_MATCHING_OBJECT( total_res, mvo()
       ("owner",       "eosio")
