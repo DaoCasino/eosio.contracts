@@ -1,37 +1,26 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE.txt
- */
-#include <eosio.system/eosio.system.hpp>
+#include <eosio/crypto.hpp>
+#include <eosio/datastream.hpp>
+#include <eosio/eosio.hpp>
+#include <eosio/multi_index.hpp>
+#include <eosio/privileged.hpp>
+#include <eosio/serialize.hpp>
+#include <eosio/singleton.hpp>
 
-#include <eosiolib/eosio.hpp>
-#include <eosiolib/crypto.h>
-#include <eosiolib/datastream.hpp>
-#include <eosiolib/serialize.hpp>
-#include <eosiolib/multi_index.hpp>
-#include <eosiolib/privileged.hpp>
-#include <eosiolib/singleton.hpp>
-#include <eosiolib/transaction.hpp>
+#include <eosio.system/eosio.system.hpp>
 #include <eosio.token/eosio.token.hpp>
 
 #include <algorithm>
 #include <cmath>
 
 namespace eosiosystem {
-   using eosio::indexed_by;
-   using eosio::const_mem_fun;
-   using eosio::singleton;
-   using eosio::transaction;
 
-   /**
-    *  This method will create a producer_config and producer_info object for 'producer'
-    *
-    *  @pre producer is not already registered
-    *  @pre producer to register is an account
-    *  @pre authority of producer to register
-    *
-    */
-   void system_contract::regproducer( const name producer, const eosio::public_key& producer_key, const std::string& url, uint16_t location ) {
+   using eosio::const_mem_fun;
+   using eosio::current_time_point;
+   using eosio::indexed_by;
+   using eosio::microseconds;
+   using eosio::singleton;
+
+   void system_contract::regproducer( const name& producer, const eosio::public_key& producer_key, const std::string& url, uint16_t location ) {
       check( url.size() < 512, "url too long" );
       check( producer_key != eosio::public_key(), "public key should not be the default value" );
       require_auth( producer );
@@ -76,7 +65,7 @@ namespace eosiosystem {
 
    }
 
-   void system_contract::unregprod( const name producer ) {
+   void system_contract::unregprod( const name& producer ) {
       require_auth( producer );
 
       const auto& prod = _producers.get( producer.value, "producer not found" );
@@ -85,46 +74,71 @@ namespace eosiosystem {
       });
    }
 
-   int32_t get_target_amount(int32_t activated_share) {
+   int32_t get_target_schedule_size(int32_t activated_share) {
       if (activated_share <= 33) {
-        return 21;
+         return 21;
       } else if (activated_share > 33 && activated_share < 60) {
-        return 21 + (activated_share - 33) * 3;
+         return 21 + (activated_share - 33) * 3;
       }
       return 102;
    }
 
-   void system_contract::update_elected_producers( block_timestamp block_time ) {
+   void system_contract::update_elected_producers( const block_timestamp& block_time ) {
       _gstate.last_producer_schedule_update = block_time;
-
-      auto idx = _producers.get_index<"prototalvote"_n>();
 
       std::vector< std::pair<eosio::producer_key,uint16_t> > top_producers;
       const asset token_supply = eosio::token::get_supply(token_account, core_symbol().code() );
-      int32_t activated_share = 100 * _gstate.active_stake / token_supply.amount;
+      const int32_t activated_share = 100 * _gstate.active_stake / token_supply.amount;
       int32_t target_schedule_size = _gstate.target_producer_schedule_size;
 
-      if (block_time.slot - _gstate.last_target_schedule_size_update.slot >= 2 * _gstate.schedule_update_interval) {
-        int32_t target_amount = get_target_amount(activated_share);
-        if (target_amount > target_schedule_size) {
-          target_schedule_size = target_schedule_size + _gstate.schedule_size_step;
-        } else if (target_amount < target_schedule_size) {
-          target_schedule_size = target_schedule_size - _gstate.schedule_size_step;
-        }
-        _gstate.last_target_schedule_size_update = block_time;
-        _gstate.target_producer_schedule_size = target_schedule_size;
+      const int32_t new_target_schedule_size = get_target_schedule_size(activated_share);
+
+      // try to decrease schedule size every schedule_decrease_delay_sec seconds
+      if (block_time.slot - _gstate4.last_schedule_size_decrease.slot >= 2 * _gstate4.schedule_decrease_delay_sec) {
+         if (new_target_schedule_size < target_schedule_size) { // decrease delay check is in the outer condition
+            target_schedule_size -= _gstate.schedule_size_step;
+            _gstate.target_producer_schedule_size = new_target_schedule_size;
+         }
+         // perform decrease attempts only once per given delay
+         _gstate4.last_schedule_size_decrease = block_time;
+      }
+
+      // try to increase schedule size every schedule_increase_delay_sec seconds
+      if (block_time.slot - _gstate4.last_schedule_size_increase.slot >= 2 * _gstate4.schedule_increase_delay_sec) {
+         if (new_target_schedule_size > target_schedule_size) {
+            target_schedule_size += _gstate.schedule_size_step;
+            _gstate.target_producer_schedule_size = new_target_schedule_size;
+         }
+
+         // perform increase attempts only once per given delay
+         _gstate4.last_schedule_size_increase = block_time;
       }
 
       top_producers.reserve(target_schedule_size);
+      ADD_DEBUG_LOG_MSG("top producers list size = " + std::to_string(target_schedule_size));
 
-      for ( auto it = idx.cbegin(); it != idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active(); ++it ) {
-         del_bandwidth_table del_tbl( _self, it->owner.value );
-         auto itr = del_tbl.find( it->owner.value );
+      auto prods_by_votes_idx = _producers.get_index<"prototalvote"_n>();
+      for ( auto it = prods_by_votes_idx.cbegin();
+            it != prods_by_votes_idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active();
+            ++it ) {
          asset total_staked(0, core_symbol());
+         // get only own total stake here (i.e. that one producer voted for himself)
+         del_bandwidth_table del_tbl( get_self(), it->owner.value );
+         auto itr = del_tbl.find( it->owner.value );
          if (itr != del_tbl.end()) {
             total_staked = itr->net_weight + itr->cpu_weight + itr->vote_weight;
          }
-         if (total_staked.amount >= min_producer_activated_share * token_supply.amount) {
+         // count stake from other voters
+         user_resources_table userres_tbl(get_self(), it->owner.value);
+         const auto userres_it = userres_tbl.find(it->owner.value);
+         if (userres_it != userres_tbl.end()) {
+            total_staked += userres_it->net_weight + userres_it->cpu_weight + userres_it->vote_weight;
+         }
+         ADD_DEBUG_LOG_MSG(it->owner.to_string() + " total staked: " + std::to_string(total_staked.amount));
+
+         // producer has to stake at least min_producer_activated_stake tokens
+         if (total_staked.amount >= min_producer_activated_stake) {
+            ADD_DEBUG_LOG_MSG("added " + it->owner.to_string() + " to schedule");
             top_producers.emplace_back( std::pair<eosio::producer_key,uint16_t>({{it->owner, it->producer_key}, it->location}) );
          }
       }
@@ -138,23 +152,22 @@ namespace eosiosystem {
       std::vector<eosio::producer_key> producers;
 
       producers.reserve(top_producers.size());
-      for( const auto& item : top_producers )
+      for( const auto& item : top_producers ) {
          producers.push_back(item.first);
+      }
 
-      auto packed_schedule = pack(producers);
-
-      if( set_proposed_producers( packed_schedule.data(),  packed_schedule.size() ) >= 0 ) {
+      if( set_proposed_producers( producers ) >= 0 ) {
          _gstate.last_producer_schedule_size = static_cast<decltype(_gstate.last_producer_schedule_size)>( top_producers.size() );
       }
    }
 
    double stake2vote( int64_t staked ) {
       /// TODO subtract 2080 brings the large numbers closer to this decade
-      double weight = int64_t( (now() - (block_timestamp::block_timestamp_epoch / 1000)) / (seconds_per_day * 7) )  / double( 52 );
+      double weight = int64_t( (current_time_point().sec_since_epoch() - (block_timestamp::block_timestamp_epoch / 1000)) / (seconds_per_day * 7) )  / double( 52 );
       return double(staked) * std::pow( 2, weight );
    }
 
-   double system_contract::update_total_votepay_share( time_point ct,
+   double system_contract::update_total_votepay_share( const time_point& ct,
                                                        double additional_shares_delta,
                                                        double shares_rate_delta )
    {
@@ -183,7 +196,7 @@ namespace eosiosystem {
    }
 
    double system_contract::update_producer_votepay_share( const producers_table2::const_iterator& prod_itr,
-                                                          time_point ct,
+                                                          const time_point& ct,
                                                           double shares_rate,
                                                           bool reset_to_zero )
    {
@@ -205,28 +218,12 @@ namespace eosiosystem {
       return new_votepay_share;
    }
 
-   /**
-    *  @pre producers must be sorted from lowest to highest and must be registered and active
-    *  @pre if proxy is set then no producers can be voted for
-    *  @pre if proxy is set then proxy account must exist and be registered as a proxy
-    *  @pre every listed producer or proxy must have been previously registered
-    *  @pre voter must authorize this action
-    *  @pre voter must have previously staked some amount of CORE_SYMBOL for voting
-    *  @pre voter->staked must be up to date
-    *
-    *  @post every producer previously voted for will have vote reduced by previous vote weight
-    *  @post every producer newly voted for will have vote increased by new vote amount
-    *  @post prior proxy will proxied_vote_weight decremented by previous vote weight
-    *  @post new proxy will proxied_vote_weight incremented by new vote weight
-    *
-    *  If voting for a proxy, the producer votes will not change until the proxy updates their own vote.
-    */
-   void system_contract::voteproducer( const name voter_name, const name proxy, const std::vector<name>& producers ) {
+   void system_contract::voteproducer( const name& voter_name, const name& proxy, const std::vector<name>& producers ) {
       require_auth( voter_name );
       update_votes( voter_name, proxy, producers, true );
    }
 
-   void system_contract::update_votes( const name voter_name, const name proxy, const std::vector<name>& producers, bool voting ) {
+   void system_contract::update_votes( const name& voter_name, const name& proxy, const std::vector<name>& producers, bool voting ) {
       //validate input
       if ( proxy ) {
          check( producers.size() == 0, "cannot vote for producers and proxy at same time" );
@@ -242,19 +239,17 @@ namespace eosiosystem {
       check( voter != _voters.end(), "user must stake before they can vote" ); /// staking creates voter object
       check( !proxy || !voter->is_proxy, "account registered as a proxy is not allowed to use a proxy" );
 
-       /*
-       * The first time someone votes we set has_voted flag
-       * and consider his stake activated.
+      /**
+       * The first time someone votes we calculate and set last_vote_weight. Since they cannot unstake until
+       * after the chain has been activated, we can use last_vote_weight to determine that this is
+       * their first vote and should consider their stake activated.
        */
-
-      if ( !voter->has_voted ) {
-         _voters.modify( voter, same_payer, [&]( auto& av ) {
-            av.has_voted = true;
-         });
+      if( _gstate.thresh_activated_stake_time == time_point() && voter->last_vote_weight <= 0.0 ) {
          _gstate.total_activated_stake += voter->staked;
-         if( _gstate.total_activated_stake >= min_activated_stake && _gstate.thresh_activated_stake_time == time_point() ) {
+         if( _gstate.total_activated_stake >= min_activated_stake ) {
             _gstate.thresh_activated_stake_time = current_time_point();
          }
+         ADD_DEBUG_LOG_MSG("_gstate.thresh_activated_stake_time = " + std::to_string(_gstate.thresh_activated_stake_time.sec_since_epoch()));
       }
 
       auto new_vote_weight = stake2vote( voter->staked );
@@ -262,7 +257,7 @@ namespace eosiosystem {
          new_vote_weight += voter->proxied_vote_weight;
       }
 
-      boost::container::flat_map<name, pair<double, bool /*new*/> > producer_deltas;
+      std::map<name, std::pair<double, bool /*new*/> > producer_deltas;
       if ( voter->last_vote_weight > 0 ) {
          if( voter->proxy ) {
             auto old_proxy = _voters.find( voter->proxy.value );
@@ -306,7 +301,9 @@ namespace eosiosystem {
       for( const auto& pd : producer_deltas ) {
          auto pitr = _producers.find( pd.first.value );
          if( pitr != _producers.end() ) {
-            check( !voting || pitr->active() || !pd.second.second /* not from new set */, "producer is not currently registered" );
+            if( voting && !pitr->active() && pd.second.second /* from new set */ ) {
+               check( false, ( "producer " + pitr->owner.to_string() + " is not currently registered" ).data() );
+            }
             double init_total_votes = pitr->total_votes;
             _producers.modify( pitr, same_payer, [&]( auto& p ) {
                p.total_votes += pd.second.first;
@@ -337,13 +334,15 @@ namespace eosiosystem {
                }
             }
          } else {
-            check( !pd.second.second /* not from new set */, "producer is not registered" ); //data corruption
+            if( pd.second.second ) {
+               check( false, ( "producer " + pd.first.to_string() + " is not registered" ).data() );
+            }
          }
       }
 
       update_total_votepay_share( ct, -total_inactive_vpay_share, delta_change_rate );
 
-      bool is_active_before = voter->is_active();
+      const bool is_active_before = voter->is_active();
 
       _voters.modify( voter, same_payer, [&]( auto& av ) {
          av.last_vote_weight = new_vote_weight;
@@ -353,7 +352,7 @@ namespace eosiosystem {
 
       // only voting can change is_active state
       if (voting) {
-        bool is_active_after = voter->is_active();
+        const bool is_active_after = voter->is_active();
 
         if (!is_active_before && is_active_after) {
           _gstate.active_stake += voter->staked;
@@ -365,16 +364,7 @@ namespace eosiosystem {
       }
    }
 
-   /**
-    *  An account marked as a proxy can vote with the weight of other accounts which
-    *  have selected it as a proxy. Other accounts must refresh their voteproducer to
-    *  update the proxy's weight.
-    *
-    *  @param isproxy - true if proxy wishes to vote on behalf of others, false otherwise
-    *  @pre proxy must have something staked (existing row in voters table)
-    *  @pre new state must be different than current state
-    */
-   void system_contract::regproxy( const name proxy, bool isproxy ) {
+   void system_contract::regproxy( const name& proxy, bool isproxy ) {
       require_auth( proxy );
 
       auto pitr = _voters.find( proxy.value );

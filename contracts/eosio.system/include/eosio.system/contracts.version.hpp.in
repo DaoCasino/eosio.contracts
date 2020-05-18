@@ -1,5 +1,15 @@
+#pragma once
+
 #include <string>
 
 namespace eosiosystem {
-    static const std::string CONTRACTS_VERSION = "${CONTRACTS_VERSION}";
-}
+
+#define CONTRACTS_VER_STR_TMP__ "${CONTRACTS_VER_DIRTY}"
+static_assert(sizeof(CONTRACTS_VER_STR_TMP__) > 1,
+    "CONTRACTS_VERSION should not be an empty string; check your build scripts and dependencies.");
+
+static const std::string CONTRACTS_VERSION = CONTRACTS_VER_STR_TMP__;
+
+#undef CONTRACTS_VER_STR_TMP__
+
+} // namespace eosiosystem

@@ -9,8 +9,14 @@
 #define CORE_SYM_STR ( _STRINGIZE2(CORE_SYM_PRECISION) "," CORE_SYM_NAME )
 #define CORE_SYM  ( ::eosio::chain::string_to_symbol_c( CORE_SYM_PRECISION, CORE_SYM_NAME ) )
 
-struct core_sym {
-   static inline eosio::chain::asset from_string(const std::string& s) {
-     return eosio::chain::asset::from_string(s + " " CORE_SYM_NAME);
-   }
-};
+namespace core_sym {
+
+inline eosio::chain::asset from_string(const std::string& s) {
+   return eosio::chain::asset::from_string(s + " " CORE_SYM_NAME);
+}
+
+inline eosio::chain::asset from_int(int64_t n) {
+   return eosio::chain::asset{n, eosio::chain::symbol{CORE_SYM}};
+}
+
+} // namespace core_sym
