@@ -68,7 +68,7 @@ namespace eosiosystem {
    static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day;  ///< half seconds per day
    static constexpr uint32_t blocks_per_hour       = 2 * 3600;
 
-   static constexpr int64_t  min_activated_stake   = 25'090'624'0000;      ///< DAO: total supply is 167'270'821 BET
+   static constexpr int64_t  min_activated_stake   = 25'090'624'0000;      ///< DAO: 15% of total supply (167'270'821 BET)
    static constexpr int64_t  ram_gift_bytes        = 1400;
    static constexpr int64_t  min_pervote_daily_pay = 100'0000;
    static constexpr uint32_t refund_delay_sec      = 14 * seconds_per_day; ///< DAO: stake lock up period = 2 weeks
