@@ -122,13 +122,7 @@ namespace eosiosystem {
             it != prods_by_votes_idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active();
             ++it ) {
          asset total_staked(0, core_symbol());
-         // get only own total stake here (i.e. that one producer voted for himself)
-         del_bandwidth_table del_tbl( get_self(), it->owner.value );
-         auto itr = del_tbl.find( it->owner.value );
-         if (itr != del_tbl.end()) {
-            total_staked = itr->net_weight + itr->cpu_weight + itr->vote_weight;
-         }
-         // count stake from other voters
+         // count total stake from himself and other voters
          user_resources_table userres_tbl(get_self(), it->owner.value);
          const auto userres_it = userres_tbl.find(it->owner.value);
          if (userres_it != userres_tbl.end()) {
