@@ -22,7 +22,7 @@ namespace eosiosystem {
       , _global4(get_self(), get_self().value)
       , _rammarket(get_self(), get_self().value)
       , _contracts_version(get_self(), get_self().value)
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       , _dlogs_singleton(get_self(), get_self().value)
 #endif
    {
@@ -31,7 +31,7 @@ namespace eosiosystem {
       _gstate3 = _global3.exists() ? _global3.get() : eosio_global_state3{};
       _gstate4 = _global4.exists() ? _global4.get() : eosio_global_state4{};
       _contracts_version.set(version_info{CONTRACTS_VERSION}, get_self());
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       _dlogs = _dlogs_singleton.exists() ? _dlogs_singleton.get() : dlogs{};
 #endif
    }
@@ -52,7 +52,7 @@ namespace eosiosystem {
       _global2.set( _gstate2, get_self() );
       _global3.set( _gstate3, get_self() );
       _global4.set( _gstate4, get_self() );
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       _dlogs_singleton.set(_dlogs, get_self());
 #endif
    }
