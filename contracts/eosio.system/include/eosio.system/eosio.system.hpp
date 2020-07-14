@@ -17,11 +17,11 @@
 #include <type_traits>
 
 // run cicd/build.sh with `--build-type Debug` option to enable enhanced logging
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
 # define ADD_DEBUG_LOG_MSG(msg) do { _dlogs.data.push_back(std::string(__func__) + ":" + std::to_string(__LINE__) + ": " + (msg)); } while (0)
 #else
 # define ADD_DEBUG_LOG_MSG(msg) do {} while (0)
-#endif // NDEBUG
+#endif // DEBUG_MODE
 
 
 namespace eosiosystem {
@@ -344,7 +344,7 @@ namespace eosiosystem {
    typedef eosio::multi_index< "refunds"_n, refund_request >      refunds_table;
 
 
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
    // some actions (like onblock()) do not allow to print anything, so we use this table for debugging
    struct [[eosio::table, eosio::contract("eosio.system")]] dlogs {
       std::vector<std::string> data; // array of log messages
@@ -352,7 +352,7 @@ namespace eosiosystem {
       EOSLIB_SERIALIZE( dlogs, (data) );
    };
    typedef eosio::singleton< "dlogs"_n, dlogs > dlogs_singleton;
-#endif // NDEBUG
+#endif // DEBUG_MODE
 
    /**
     * The EOSIO system contract. The EOSIO system contract governs ram market, voters, producers, global state.
@@ -373,10 +373,10 @@ namespace eosiosystem {
          eosio_global_state4         _gstate4;
          rammarket                   _rammarket;
          contracts_version_singleton _contracts_version;
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
          dlogs                       _dlogs;
          dlogs_singleton             _dlogs_singleton;
-#endif // NDEBUG
+#endif // DEBUG_MODE
 
       public:
          static constexpr eosio::name active_permission{"active"_n};

@@ -66,8 +66,10 @@ endif()
 # libfc.a (for release) or libfc_debug.a (for debug) (the same for secp256k1 library).
 # (see EosioTester.cmake)
 set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE}) # use given build type only for tests
+set(DEBUG_MODE 0) # exclude dlogs table (cannot use CMAKE_BUILD_TYPE + NDEBUG: tests get broken)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+  set(DEBUG_MODE 1)
 endif()
 
 ExternalProject_Add(
@@ -75,6 +77,7 @@ ExternalProject_Add(
   SOURCE_DIR ${CMAKE_SOURCE_DIR}/contracts
   BINARY_DIR ${CMAKE_BINARY_DIR}/contracts
   CMAKE_ARGS
+    -DDEBUG_MODE=${DEBUG_MODE}
     -DCMAKE_TOOLCHAIN_FILE=${EOSIO_CDT_ROOT}/lib/cmake/eosio.cdt/EosioWasmToolchain.cmake
     -DCONTRACTS_VER_DIRTY=${CONTRACTS_VER_DIRTY}
   UPDATE_COMMAND ""
