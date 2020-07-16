@@ -13,6 +13,12 @@ namespace eosiosystem {
 
       require_auth(get_self());
 
+
+      // removed dlogs data from production
+      // TODO: remove
+      _dlogs.data.clear();
+
+
       block_timestamp timestamp;
       name producer;
       _ds >> timestamp >> producer;
