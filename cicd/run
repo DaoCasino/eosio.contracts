@@ -9,7 +9,7 @@ shift
 
 case "$cmd" in
 (build) eval "$run_node_with_cdt_cmd" ./cicd/build.sh --build-tests ;;
-(test)  eval "$run_node_with_cdt_cmd" ./build/tests/unit_test -p "$@" ;;
+(test)  eval "$run_node_with_cdt_cmd" ./build/tests/unit_tests -p "$@" ;;
 (pack)  eval "$run_node_with_cdt_cmd" ./cicd/pack.sh ;;
 (shell) eval "$run_node_with_cdt_cmd" bash ;;
 (*)     echo >&2 "Invalid command: $cmd." ; exit 1 ;;
