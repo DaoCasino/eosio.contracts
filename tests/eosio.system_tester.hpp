@@ -666,6 +666,7 @@ public:
       return producer_names;
    }
 
+   // vote 15% of issued tokens, to make claimrewards() and undelegatebw() available
    asset cross_15_percent_threshold() {
       const asset vote_15_percent = STRSYM("25090625.0000");
       setup_producer_accounts({N(producer1111)});
