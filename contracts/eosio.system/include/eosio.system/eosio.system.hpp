@@ -41,22 +41,23 @@ namespace eosiosystem {
    using eosio::unsigned_int;
 
    template<typename E, typename F>
-   static inline auto has_field( F flags, E field )
+   static inline bool has_field( F flags, E field )
    -> std::enable_if_t< std::is_integral_v<F> && std::is_unsigned_v<F> &&
                         std::is_enum_v<E> && std::is_same_v< F, std::underlying_type_t<E> >, bool>
    {
-      return ( (flags & static_cast<F>(field)) != 0 );
+      return (flags & static_cast<F>(field)) != 0;
    }
 
    template<typename E, typename F>
-   static inline auto set_field( F flags, E field, bool value = true )
+   static inline F set_field( F flags, E field, bool value = true )
    -> std::enable_if_t< std::is_integral_v<F> && std::is_unsigned_v<F> &&
                         std::is_enum_v<E> && std::is_same_v< F, std::underlying_type_t<E> >, F >
    {
-      if( value )
-         return ( flags | static_cast<F>(field) );
-      else
-         return ( flags & ~static_cast<F>(field) );
+      if( value ) {
+         return flags | static_cast<F>(field);
+      } else {
+         return flags & ~static_cast<F>(field);
+      }
    }
 
    static constexpr uint32_t seconds_per_year      = 52 * 7 * 24 * 3600;
