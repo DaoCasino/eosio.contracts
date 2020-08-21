@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_SUITE(eosio_system_tests)
 static bool within_error(int64_t a, int64_t b, int64_t err) { return std::abs(a - b) <= err; };
 static bool within_one(int64_t a, int64_t b) { return within_error(a, b, 1); }
 
-static double get_target_emission_per_year(double activated_share) {
+static double get_target_emission_rate_per_year(double activated_share) {
    if (activated_share <= 0.33) {
       return 0.2;
    } else if (activated_share >= 0.66) {
@@ -1311,7 +1311,7 @@ BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test
    // First case with activated_share >= 0.66 (-> emission = 0.1)
    auto initial_global_state = get_global_state();
    asset initial_supply = get_token_supply();
-   double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+   double emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
    BOOST_REQUIRE ( 0.66 <= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() );
    BOOST_REQUIRE_EQUAL(0.1, emission_rate);
 
@@ -1331,7 +1331,7 @@ BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test
    initial_supply = get_token_supply();
    BOOST_TEST_REQUIRE(1.0 == initial_supply_after / initial_supply.get_amount());
 
-   emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+   emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
    BOOST_REQUIRE ( 0.66 >= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() &&
                    0.33 <= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
    BOOST_REQUIRE(0.1 <= emission_rate && 0.2 >= emission_rate);
@@ -1342,7 +1342,7 @@ BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test
    initial_global_state = get_global_state();
    initial_supply = get_token_supply();
 
-   emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+   emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
    BOOST_REQUIRE ( 0.66 >= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() &&
                    0.33 <= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
    BOOST_REQUIRE(0.1 <= emission_rate && 0.2 >= emission_rate);
@@ -1355,7 +1355,7 @@ BOOST_FIXTURE_TEST_CASE( token_emission, eosio_system_tester, * boost::unit_test
 
    initial_global_state = get_global_state();
    initial_supply = get_token_supply();
-   emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+   emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
    BOOST_REQUIRE ( 0.33 >= 1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount() );
    BOOST_REQUIRE_EQUAL(0.2, emission_rate);
 
@@ -1411,7 +1411,7 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
 
       const asset initial_supply  = get_token_supply();
       const asset initial_balance = get_balance(N(defproducera));
-      const double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["total_activated_stake"].as<int64_t>() / initial_supply.get_amount());
+      const double emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["total_activated_stake"].as<int64_t>() / initial_supply.get_amount());
       const double continuous_rate = get_continuous_rate(emission_rate);
 
       BOOST_REQUIRE_EQUAL(success(), push_action(N(defproducera), N(claimrewards), mvo()("owner", "defproducera")));
@@ -1502,7 +1502,7 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
 
       const asset initial_supply  = get_token_supply();
       const asset initial_balance = get_balance(N(defproducera));
-      const double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["total_activated_stake"].as<int64_t>() / initial_supply.get_amount());
+      const double emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["total_activated_stake"].as<int64_t>() / initial_supply.get_amount());
       const double continuous_rate = get_continuous_rate(emission_rate);
 
       BOOST_REQUIRE_EQUAL(success(), push_action(N(defproducera), N(claimrewards), mvo()("owner", "defproducera")));
@@ -1559,7 +1559,7 @@ BOOST_FIXTURE_TEST_CASE(producer_pay, eosio_system_tester, * boost::unit_test::t
       const int64_t initial_dao = get_balance(N(eosio.saving)).get_amount(); // DAOBET
       const auto    initial_global_state = get_global_state();
 
-      const double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+      const double emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
 
       for (uint32_t i = 0; i < 7 * 52; ++i) {
          produce_block(fc::seconds(8 * 3600));
@@ -1736,7 +1736,7 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
 
       ///@{
       ///DAOBET
-      const double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
+      const double emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["active_stake"].as<int64_t>() / initial_supply.get_amount());
       const double continuous_rate = get_continuous_rate(emission_rate);
       ///@}
 
@@ -1884,7 +1884,7 @@ BOOST_FIXTURE_TEST_CASE(multiple_producer_pay, eosio_system_tester, * boost::uni
    //    const uint64_t initial_prod_update_time  = microseconds_since_epoch_of_iso_string( initial_prod_info2["last_votepay_share_update"] );
    //    const int64_t  initial_dao               = get_balance(N(eosio.saving)).get_amount();
 
-   //    const double emission_rate = get_target_emission_per_year(1.0 * initial_global_state["total_activated_stake"].as<int64_t>() / initial_supply.get_amount());
+   //    const double emission_rate = get_target_emission_rate_per_year(1.0 * initial_global_state["total_activated_stake"].as<int64_t>() / initial_supply.get_amount());
    //    const double continuous_rate = get_continuous_rate(emission_rate);
 
 

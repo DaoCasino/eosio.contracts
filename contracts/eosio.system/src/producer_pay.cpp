@@ -82,7 +82,7 @@ namespace eosiosystem {
 
    ///@{
    ///DAO
-   double get_target_emission_per_year(double activated_share) {
+   double get_target_emission_rate_per_year(double activated_share) {
       if (activated_share <= 0.33) {
          return 0.2;
       } else if (activated_share >= 0.66) {
@@ -117,7 +117,7 @@ namespace eosiosystem {
       if( usecs_since_last_fill > 0 && _gstate.last_pervote_bucket_fill > time_point() ) {
          ///@{
          ///DAO: continuous rate formulae (#4); rewards
-         double emission_rate = get_target_emission_per_year(1.0 * _gstate.active_stake / token_supply.amount);
+         double emission_rate = get_target_emission_rate_per_year(1.0 * _gstate.active_stake / token_supply.amount);
          double continuous_rate = get_continuous_rate(emission_rate);
          auto new_tokens = static_cast<int64_t>(continuous_rate * token_supply.amount * usecs_since_last_fill / useconds_per_year);
          auto to_dao           = new_tokens / 5; // goes to eosio.saving account
