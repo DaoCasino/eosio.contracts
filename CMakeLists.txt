@@ -1,8 +1,10 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 
 set(PROJECT "eosio_contracts")
 
 project(${PROJECT})
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
 # Check equal CMAKE_SOURCE_DIR and CMAKE_BINARY_DIR
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
@@ -27,11 +29,16 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
     "4) Run cmake targetting ${CMAKE_SOURCE_DIR}, for example: ${cmd}")
 endif()
 
+# doxygen
+set(BUILD_DOXYGEN on CACHE BOOL "Build doxygen documentation by default")
+
 include(daobet-utils) # from daobet/CMakeModules
 
 get_version_from_git(_ CONTRACTS_VER_DIRTY)
 message(STATUS "Building eosio.contracts (version ${CONTRACTS_VER_DIRTY})...")
 #XXX: CONTRACTS_VER_DIRTY used in contracts/eosio.system/include/eosio.system/contracts.version.hpp.in
+
+include(doxygen)
 
 include(ExternalProject)
 find_package(eosio.cdt)
