@@ -68,7 +68,7 @@ namespace eosiosystem {
       auto itr = _rammarket.find(ramcore_symbol.raw());
 
       /**
-       *  Increase the amount of ram for sale based upon the change in max ram size.
+       * Increase the amount of ram for sale based upon the change in max ram size.
        */
       _rammarket.modify( itr, same_payer, [&]( auto& m ) {
          m.base.balance.amount += delta;
@@ -87,7 +87,7 @@ namespace eosiosystem {
       _gstate.max_ram_size += new_ram;
 
       /**
-       *  Increase the amount of ram for sale based upon the change in max ram size.
+       * Increase the amount of ram for sale based upon the change in max ram size.
        */
       _rammarket.modify( itr, same_payer, [&]( auto& m ) {
          m.base.balance.amount += new_ram;
@@ -325,7 +325,7 @@ namespace eosiosystem {
          }
       }
 
-      user_resources_table  userres( get_self(), newact.value );
+      user_resources_table userres( get_self(), newact.value );
 
       userres.emplace( newact, [&]( auto& res ) {
         res.owner = newact;
@@ -338,7 +338,7 @@ namespace eosiosystem {
    }
 
    void native::setabi( const name& acnt, const std::vector<char>& abi ) {
-      eosio::multi_index< "abihash"_n, abi_hash >  table(get_self(), get_self().value);
+      eosio::multi_index< "abihash"_n, abi_hash > table(get_self(), get_self().value);
       auto itr = table.find( acnt.value );
       if( itr == table.end() ) {
          table.emplace( acnt, [&]( auto& row ) {
@@ -359,7 +359,7 @@ namespace eosiosystem {
       auto itr = _rammarket.find(ramcore_symbol.raw());
       check( itr == _rammarket.end(), "system contract has already been initialized" );
 
-      auto system_token_supply   = eosio::token::get_supply(token_account, core.code() );
+      auto system_token_supply = eosio::token::get_supply(token_account, core.code() );
       check( system_token_supply.symbol == core, "specified core symbol does not exist (precision mismatch)" );
 
       check( system_token_supply.amount > 0, "system token supply must be greater than 0" );

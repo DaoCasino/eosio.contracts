@@ -30,7 +30,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 endif()
 
 # doxygen
-set(BUILD_DOXYGEN on CACHE BOOL "Build doxygen documentation by default")
+set(BUILD_DOXYGEN off CACHE BOOL "Build doxygen documentation by default")
 
 include(daobet-utils) # from daobet/CMakeModules
 

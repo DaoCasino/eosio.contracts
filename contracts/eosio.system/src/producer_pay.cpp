@@ -22,18 +22,17 @@ namespace eosiosystem {
       // is eventually completely removed, at which point this line can be removed.
       _gstate2.last_block_num = timestamp;
 
-      /** until activation, no new rewards are paid */
-      if( _gstate.thresh_activated_stake_time == time_point() )
+      /// Until activation, no new rewards are paid.
+      if( _gstate.thresh_activated_stake_time == time_point() ) {
          return;
+      }
 
-      if( _gstate.last_pervote_bucket_fill == time_point() )  /// start the presses
+      if( _gstate.last_pervote_bucket_fill == time_point() ) { // start the presses
          _gstate.last_pervote_bucket_fill = current_time_point();
+      }
 
-
-      /**
-       * At startup the initial producer may not be one that is registered / elected
-       * and therefore there may be no producer object for them.
-       */
+      /// At startup, the initial producer may not be one that is registered / elected
+      /// and therefore there may be no producer object for them.
       auto prod = _producers.find( producer.value );
       if ( prod != _producers.end() ) {
          _gstate.total_unpaid_blocks++;
@@ -42,7 +41,7 @@ namespace eosiosystem {
          });
       }
 
-      /// only update block producers once every minute, block_timestamp is in half seconds
+      // only update block producers once every minute, block_timestamp is in half seconds
       if( timestamp.slot - _gstate.last_producer_schedule_update.slot > 120 ) {
          update_elected_producers( timestamp );
          ADD_DEBUG_LOG_MSG("prods updated");
@@ -111,7 +110,7 @@ namespace eosiosystem {
 
       check( ct - prod.last_claim_time > microseconds(useconds_per_day), "already claimed rewards within past day" );
 
-      const asset token_supply   = token::get_supply(token_account, core_symbol().code() );
+      const asset token_supply = token::get_supply(token_account, core_symbol().code() );
       const auto usecs_since_last_fill = (ct - _gstate.last_pervote_bucket_fill).count();
 
       if( usecs_since_last_fill > 0 && _gstate.last_pervote_bucket_fill > time_point() ) {
@@ -161,7 +160,7 @@ namespace eosiosystem {
       if ( prod2 != _producers2.end() ) {
          updated_after_threshold = (last_claim_plus_3days <= prod2->last_votepay_share_update);
       } else {
-         prod2 = _producers2.emplace( owner, [&]( producer_info2& info  ) {
+         prod2 = _producers2.emplace( owner, [&]( producer_info2& info ) {
             info.owner                     = owner;
             info.last_votepay_share_update = ct;
          });
@@ -188,8 +187,9 @@ namespace eosiosystem {
          double total_votepay_share = update_total_votepay_share( ct );
          if( total_votepay_share > 0 && !crossed_threshold ) {
             producer_per_vote_pay = int64_t((new_votepay_share * _gstate.pervote_bucket) / total_votepay_share);
-            if( producer_per_vote_pay > _gstate.pervote_bucket )
+            if( producer_per_vote_pay > _gstate.pervote_bucket ) {
                producer_per_vote_pay = _gstate.pervote_bucket;
+            }
          }
       } else {
          if( _gstate.total_producer_vote_weight > 0 ) {
