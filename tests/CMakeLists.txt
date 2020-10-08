@@ -40,12 +40,12 @@ set(unittest_src
   eosio.wrap_tests.cpp
 )
 
-add_eosio_test_executable(unit_test
+add_eosio_test_executable(unit_tests
   ${unittest_src}
   main.cpp
 )
 
-target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}")
+target_include_directories(unit_tests PUBLIC "${CMAKE_BINARY_DIR}")
 
 # TODO: check this loop!!!
 # mark test suites for execution
@@ -63,10 +63,10 @@ foreach(test_suite ${unit_tests}) # create an independent target for each test s
       OUTPUT_VARIABLE trimmed_suite_name
       OUTPUT_STRIP_TRAILING_WHITESPACE
     ) # trim "_test" or "_tests" from the end of ${SUITE_NAME}
-    # to run unit_test with all log from blockchain displayed, put "--verbose" after "--", i.e. "unit_test -- --verbose"
+    # to run unit_tests with all log from blockchain displayed, put "--verbose" after "--", i.e. "unit_tests -- --verbose"
     add_test(
       NAME ${trimmed_suite_name}_unit_test
-      COMMAND unit_test --run_test=${suite_name} --report_level=detailed --color_output
+      COMMAND unit_tests --run_test=${suite_name} --report_level=detailed --color_output
     )
   endif()
 endforeach()

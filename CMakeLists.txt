@@ -1,8 +1,10 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 
 set(PROJECT "eosio_contracts")
 
 project(${PROJECT})
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
 # Check equal CMAKE_SOURCE_DIR and CMAKE_BINARY_DIR
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
@@ -27,11 +29,16 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
     "4) Run cmake targetting ${CMAKE_SOURCE_DIR}, for example: ${cmd}")
 endif()
 
+# doxygen
+set(BUILD_DOXYGEN off CACHE BOOL "Build doxygen documentation by default")
+
 include(daobet-utils) # from daobet/CMakeModules
 
 get_version_from_git(_ CONTRACTS_VER_DIRTY)
 message(STATUS "Building eosio.contracts (version ${CONTRACTS_VER_DIRTY})...")
 #XXX: CONTRACTS_VER_DIRTY used in contracts/eosio.system/include/eosio.system/contracts.version.hpp.in
+
+include(doxygen)
 
 include(ExternalProject)
 find_package(eosio.cdt)
@@ -66,8 +73,10 @@ endif()
 # libfc.a (for release) or libfc_debug.a (for debug) (the same for secp256k1 library).
 # (see EosioTester.cmake)
 set(TEST_BUILD_TYPE ${CMAKE_BUILD_TYPE}) # use given build type only for tests
+set(DEBUG_MODE 0) # exclude dlogs table (cannot use CMAKE_BUILD_TYPE + NDEBUG: tests get broken)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+  set(DEBUG_MODE 1)
 endif()
 
 ExternalProject_Add(
@@ -75,6 +84,7 @@ ExternalProject_Add(
   SOURCE_DIR ${CMAKE_SOURCE_DIR}/contracts
   BINARY_DIR ${CMAKE_BINARY_DIR}/contracts
   CMAKE_ARGS
+    -DDEBUG_MODE=${DEBUG_MODE}
     -DCMAKE_TOOLCHAIN_FILE=${EOSIO_CDT_ROOT}/lib/cmake/eosio.cdt/EosioWasmToolchain.cmake
     -DCONTRACTS_VER_DIRTY=${CONTRACTS_VER_DIRTY}
   UPDATE_COMMAND ""

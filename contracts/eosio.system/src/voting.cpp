@@ -20,6 +20,25 @@ namespace eosiosystem {
    using eosio::microseconds;
    using eosio::singleton;
 
+   // helpers
+
+   int32_t get_target_schedule_size(int32_t activated_share) {
+      if (activated_share <= 33) {
+         return 21;
+      } else if (activated_share > 33 && activated_share < 60) {
+         return 21 + (activated_share - 33) * 3;
+      }
+      return 102;
+   }
+
+   double stake2vote(int64_t staked) {
+      /// TODO subtract 2080 brings the large numbers closer to this decade
+      double weight = int64_t( (current_time_point().sec_since_epoch() - (block_timestamp::block_timestamp_epoch / 1000)) / (seconds_per_day * 7) ) / double( 52 );
+      return double(staked) * std::pow( 2, weight );
+   }
+
+   // actions
+
    void system_contract::regproducer( const name& producer, const eosio::public_key& producer_key, const std::string& url, uint16_t location ) {
       check( url.size() < 512, "url too long" );
       check( producer_key != eosio::public_key(), "public key should not be the default value" );
@@ -74,15 +93,6 @@ namespace eosiosystem {
       });
    }
 
-   int32_t get_target_schedule_size(int32_t activated_share) {
-      if (activated_share <= 33) {
-         return 21;
-      } else if (activated_share > 33 && activated_share < 60) {
-         return 21 + (activated_share - 33) * 3;
-      }
-      return 102;
-   }
-
    void system_contract::update_elected_producers( const block_timestamp& block_time ) {
       _gstate.last_producer_schedule_update = block_time;
 
@@ -122,13 +132,7 @@ namespace eosiosystem {
             it != prods_by_votes_idx.cend() && top_producers.size() < target_schedule_size && 0 < it->total_votes && it->active();
             ++it ) {
          asset total_staked(0, core_symbol());
-         // get only own total stake here (i.e. that one producer voted for himself)
-         del_bandwidth_table del_tbl( get_self(), it->owner.value );
-         auto itr = del_tbl.find( it->owner.value );
-         if (itr != del_tbl.end()) {
-            total_staked = itr->net_weight + itr->cpu_weight + itr->vote_weight;
-         }
-         // count stake from other voters
+         // count total stake from himself and other voters
          user_resources_table userres_tbl(get_self(), it->owner.value);
          const auto userres_it = userres_tbl.find(it->owner.value);
          if (userres_it != userres_tbl.end()) {
@@ -159,12 +163,6 @@ namespace eosiosystem {
       if( set_proposed_producers( producers ) >= 0 ) {
          _gstate.last_producer_schedule_size = static_cast<decltype(_gstate.last_producer_schedule_size)>( top_producers.size() );
       }
-   }
-
-   double stake2vote( int64_t staked ) {
-      /// TODO subtract 2080 brings the large numbers closer to this decade
-      double weight = int64_t( (current_time_point().sec_since_epoch() - (block_timestamp::block_timestamp_epoch / 1000)) / (seconds_per_day * 7) )  / double( 52 );
-      return double(staked) * std::pow( 2, weight );
    }
 
    double system_contract::update_total_votepay_share( const time_point& ct,
@@ -377,7 +375,7 @@ namespace eosiosystem {
          propagate_weight_change( *pitr );
       } else {
          _voters.emplace( proxy, [&]( auto& p ) {
-               p.owner  = proxy;
+               p.owner = proxy;
                p.is_proxy = isproxy;
             });
       }
@@ -391,7 +389,7 @@ namespace eosiosystem {
       }
 
       /// don't propagate small changes (1 ~= epsilon)
-      if ( fabs( new_weight - voter.last_vote_weight ) > 1 )  {
+      if ( fabs( new_weight - voter.last_vote_weight ) > 1 ) {
          if ( voter.proxy ) {
             auto& proxy = _voters.get( voter.proxy.value, "proxy not found" ); //data corruption
             _voters.modify( proxy, same_payer, [&]( auto& p ) {

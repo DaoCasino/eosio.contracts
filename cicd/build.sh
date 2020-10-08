@@ -21,6 +21,7 @@ build_type=RelWithDebInfo
 #local_clang=n
 verbose=n
 build_tests=n
+build_docs=n
 
 usage() {
   echo "Compile contracts."
@@ -36,6 +37,8 @@ usage() {
   #echo "  --local-clang        : build and use a partucular version of Clang toolchain locally"
   echo "  --build-tests        : build tests"
   echo "  --verbose            : verbose build"
+  echo "  --docs               : build doxygen docs (better use \`make docs' to omit cmake-phase and get"
+  echo "                         much less dependencies)"
   echo
   echo "  -h, --help           : print this message"
 }
@@ -44,6 +47,7 @@ OPTS="$( getopt -o "h" -l "\
 build-type:,\
 build-tests,\
 verbose,\
+docs,\
 help" -n "$PROGNAME" -- "$@" )"
 eval set -- "$OPTS"
 while true; do
@@ -52,14 +56,13 @@ while true; do
   #(--local-clang)  local_clang=y   ; shift   ; readonly local_clang ;; # not needed on >=ubuntu-18.04
   (--build-tests)  build_tests=y   ; shift   ; readonly build_tests ;;
   (--verbose)      verbose=y       ; shift   ; readonly verbose ;;
+  (--docs)         build_docs=y    ; shift   ; readonly build_docs ;;
   (-h|--help)      usage ; exit 0 ;;
   (--)             shift ; break ;;
   (*)              die "Invalid option: ${1:-}." ;;
   esac
 done
 unset OPTS
-
-readonly build_type verbose build_tests
 
 ###
 
@@ -68,27 +71,30 @@ log
 log "  build type  = $build_type"
 log "  node root   = $node_root"
 log "  build tests = $build_tests"
+log "  build docs  = $build_docs"
 log "  # of CPUs   = $ncores"
 #log "  cmake executable  = ${CMAKE_CMD:-"<not found>"}"
 
 ###
 
-cmake_flags=(
+cmake_args=(
   -D CMAKE_BUILD_TYPE="$build_type"
   -D CMAKE_MODULE_PATH="$node_root/lib/cmake/$project"
   -D CMAKE_LINKER="$cdt_root"/bin/lld
   -D Boost_NO_SYSTEM_PATHS=on
 )
-[[ -z "$boost_root" ]]    || cmake_flags+=(-D BOOST_ROOT="$boost_root")
-[[ "$build_tests" == n ]] || cmake_flags+=(-D BUILD_TESTS=on)
+[[ -z "$boost_root" ]]    || cmake_args+=(-D BOOST_ROOT="$boost_root")
+[[ "$build_tests" == n ]] || cmake_args+=(-D BUILD_TESTS=on)
+[[ "$build_docs" == n ]]  || cmake_args+=(-D BUILD_DOXYGEN=on)
 
-make_flags=(-j "$ncores")
-[[ "$verbose" == n ]] || make_flags+=(VERBOSE=1)
+make_args=(-j "$ncores")
+[[ "$verbose" == n ]]    || make_args+=(VERBOSE=1)
+[[ "$build_docs" == n ]] || make_args+=(all docs)
 
 mkdir -p "$build_dir"
 pushd "$build_dir"
   set -x
-  cmake "${cmake_flags[@]}" ..
-  make "${make_flags[@]}"
+  cmake "${cmake_args[@]}" ..
+  make "${make_args[@]}"
   set +x
 popd

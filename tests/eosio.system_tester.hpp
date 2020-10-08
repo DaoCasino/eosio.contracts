@@ -565,21 +565,21 @@ public:
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "refund_request", data, abi_serializer_max_time );
    }
 
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
    fc::variant get_dlogs() const {
       vector<char> data = get_row_by_account( config::system_account_name, config::system_account_name, N(dlogs), N(dlogs) );
       return data.empty() ? fc::variant() : abi_ser.binary_to_variant( "dlogs", data, abi_serializer_max_time );
    }
-#endif // NDEBUG
+#endif // DEBUG_MODE
 
    void print_debug_logs() const {
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       std::string dlog;
       for (const auto& log : get_dlogs()["data"].as<std::vector<std::string>>()) {
          dlog += "  " + log + "\n";
       }
       BOOST_TEST_MESSAGE("debug log:\n" + dlog);
-#endif // NDEBUG
+#endif // DEBUG_MODE
    }
 
    abi_serializer initialize_multisig() {
@@ -666,6 +666,7 @@ public:
       return producer_names;
    }
 
+   // vote 15% of issued tokens, to make claimrewards() and undelegatebw() available
    asset cross_15_percent_threshold() {
       const asset vote_15_percent = STRSYM("25090625.0000");
       setup_producer_accounts({N(producer1111)});

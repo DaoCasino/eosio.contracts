@@ -73,7 +73,7 @@ namespace eosiosystem {
 
       const auto& market = _rammarket.get(ramcore_symbol.raw(), "ram market does not exist");
       _rammarket.modify( market, same_payer, [&]( auto& es ) {
-         bytes_out = es.direct_convert( quant_after_fee,  ram_symbol ).amount;
+         bytes_out = es.direct_convert( quant_after_fee, ram_symbol ).amount;
       });
 
       check( bytes_out > 0, "must reserve a positive amount" );
@@ -81,9 +81,9 @@ namespace eosiosystem {
       _gstate.total_ram_bytes_reserved += uint64_t(bytes_out);
       _gstate.total_ram_stake          += quant_after_fee.amount;
 
-      user_resources_table  userres( get_self(), receiver.value );
+      user_resources_table userres( get_self(), receiver.value );
       auto res_itr = userres.find( receiver.value );
-      if( res_itr ==  userres.end() ) {
+      if( res_itr == userres.end() ) {
          res_itr = userres.emplace( receiver, [&]( auto& res ) {
                res.owner = receiver;
                res.net_weight = asset( 0, core_symbol() );
@@ -117,7 +117,7 @@ namespace eosiosystem {
 
       check( bytes > 0, "cannot sell negative byte" );
 
-      user_resources_table  userres( get_self(), account.value );
+      user_resources_table userres( get_self(), account.value );
       auto res_itr = userres.find( account.value );
       check( res_itr != userres.end(), "no resource row" );
       check( res_itr->ram_bytes >= bytes, "insufficient quota" );
@@ -194,7 +194,7 @@ namespace eosiosystem {
 
       // update stake delegated from "from" to "receiver"
       {
-         del_bandwidth_table     del_tbl( get_self(), from.value );
+         del_bandwidth_table del_tbl( get_self(), from.value );
          auto itr = del_tbl.find( receiver.value );
          if( itr == del_tbl.end() ) {
             itr = del_tbl.emplace( from, [&]( auto& dbo ){
@@ -223,9 +223,9 @@ namespace eosiosystem {
 
       // update totals of "receiver"
       {
-         user_resources_table   totals_tbl( get_self(), receiver.value );
+         user_resources_table totals_tbl( get_self(), receiver.value );
          auto tot_itr = totals_tbl.find( receiver.value );
-         if( tot_itr ==  totals_tbl.end() ) {
+         if( tot_itr == totals_tbl.end() ) {
             tot_itr = totals_tbl.emplace( from, [&]( auto& tot ) {
                   tot.owner = receiver;
                   tot.net_weight    = stake_net_delta;
@@ -383,7 +383,7 @@ namespace eosiosystem {
       auto voter_itr = _voters.find( voter.value );
       if( voter_itr == _voters.end() ) {
          voter_itr = _voters.emplace( voter, [&]( auto& v ) {
-            v.owner  = voter;
+            v.owner = voter;
             v.staked = total_update.amount;
          });
       } else {

@@ -22,7 +22,7 @@ namespace eosiosystem {
       , _global4(get_self(), get_self().value)
       , _rammarket(get_self(), get_self().value)
       , _contracts_version(get_self(), get_self().value)
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       , _dlogs_singleton(get_self(), get_self().value)
 #endif
    {
@@ -31,7 +31,7 @@ namespace eosiosystem {
       _gstate3 = _global3.exists() ? _global3.get() : eosio_global_state3{};
       _gstate4 = _global4.exists() ? _global4.get() : eosio_global_state4{};
       _contracts_version.set(version_info{CONTRACTS_VERSION}, get_self());
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       _dlogs = _dlogs_singleton.exists() ? _dlogs_singleton.get() : dlogs{};
 #endif
    }
@@ -52,7 +52,7 @@ namespace eosiosystem {
       _global2.set( _gstate2, get_self() );
       _global3.set( _gstate3, get_self() );
       _global4.set( _gstate4, get_self() );
-#ifndef NDEBUG
+#ifdef DEBUG_MODE
       _dlogs_singleton.set(_dlogs, get_self());
 #endif
    }
@@ -68,7 +68,7 @@ namespace eosiosystem {
       auto itr = _rammarket.find(ramcore_symbol.raw());
 
       /**
-       *  Increase the amount of ram for sale based upon the change in max ram size.
+       * Increase the amount of ram for sale based upon the change in max ram size.
        */
       _rammarket.modify( itr, same_payer, [&]( auto& m ) {
          m.base.balance.amount += delta;
@@ -87,7 +87,7 @@ namespace eosiosystem {
       _gstate.max_ram_size += new_ram;
 
       /**
-       *  Increase the amount of ram for sale based upon the change in max ram size.
+       * Increase the amount of ram for sale based upon the change in max ram size.
        */
       _rammarket.modify( itr, same_payer, [&]( auto& m ) {
          m.base.balance.amount += new_ram;
@@ -325,7 +325,7 @@ namespace eosiosystem {
          }
       }
 
-      user_resources_table  userres( get_self(), newact.value );
+      user_resources_table userres( get_self(), newact.value );
 
       userres.emplace( newact, [&]( auto& res ) {
         res.owner = newact;
@@ -338,7 +338,7 @@ namespace eosiosystem {
    }
 
    void native::setabi( const name& acnt, const std::vector<char>& abi ) {
-      eosio::multi_index< "abihash"_n, abi_hash >  table(get_self(), get_self().value);
+      eosio::multi_index< "abihash"_n, abi_hash > table(get_self(), get_self().value);
       auto itr = table.find( acnt.value );
       if( itr == table.end() ) {
          table.emplace( acnt, [&]( auto& row ) {
@@ -359,7 +359,7 @@ namespace eosiosystem {
       auto itr = _rammarket.find(ramcore_symbol.raw());
       check( itr == _rammarket.end(), "system contract has already been initialized" );
 
-      auto system_token_supply   = eosio::token::get_supply(token_account, core.code() );
+      auto system_token_supply = eosio::token::get_supply(token_account, core.code() );
       check( system_token_supply.symbol == core, "specified core symbol does not exist (precision mismatch)" );
 
       check( system_token_supply.amount > 0, "system token supply must be greater than 0" );
