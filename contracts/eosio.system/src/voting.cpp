@@ -107,7 +107,7 @@ namespace eosiosystem {
       if (block_time.slot - _gstate4.last_schedule_size_decrease.slot >= 2 * _gstate4.schedule_decrease_delay_sec) {
          if (new_target_schedule_size < target_schedule_size) { // decrease delay check is in the outer condition
             target_schedule_size -= _gstate.schedule_size_step;
-            _gstate.target_producer_schedule_size = new_target_schedule_size;
+            _gstate.target_producer_schedule_size = target_schedule_size;
          }
          // perform decrease attempts only once per given delay
          _gstate4.last_schedule_size_decrease = block_time;
@@ -117,7 +117,7 @@ namespace eosiosystem {
       if (block_time.slot - _gstate4.last_schedule_size_increase.slot >= 2 * _gstate4.schedule_increase_delay_sec) {
          if (new_target_schedule_size > target_schedule_size) {
             target_schedule_size += _gstate.schedule_size_step;
-            _gstate.target_producer_schedule_size = new_target_schedule_size;
+            _gstate.target_producer_schedule_size = target_schedule_size;
          }
 
          // perform increase attempts only once per given delay

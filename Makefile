@@ -26,7 +26,7 @@ run-unit-tests:
 
 .PHONY: run-verbose-test
 run-verbose-test:
-	./build/tests/unit_tests -l all -r detailed -t tests/"$(t)" -- --verbose
+	./build/tests/unit_tests -l all -r detailed -t "$(t)" -- --verbose
 
 # see also `cicd/build.sh docs'
 .PHONY: docs
