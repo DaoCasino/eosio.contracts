@@ -4039,7 +4039,7 @@ BOOST_FIXTURE_TEST_CASE( stake_validators_correlation, eosio_system_tester ) try
    BOOST_TEST_MESSAGE("active stake = " << get_global_state()["active_stake"].as<int64_t>() <<
                       "; total stake = " << get_token_supply().to_string());
 
-   BOOST_TEST_MESSAGE("XXX: active schedule size = " << control->head_block_state()->active_schedule.producers.size());
+   BOOST_TEST_MESSAGE("XXX: active schedule size = " << active_producers_num());
 
 } FC_LOG_AND_RETHROW()
 
