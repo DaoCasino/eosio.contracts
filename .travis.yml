@@ -3,8 +3,6 @@ git:
   depth: false
 services:
 - docker
-matrix:
-  fast_finish: true
 jobs:
   include:
   - stage: build
@@ -14,6 +12,7 @@ jobs:
     - "./cicd/run build"
     - "./cicd/run test"
     - "./cicd/run pack"
+  fast_finish: true
 deploy:
   provider: releases
   api_key:
