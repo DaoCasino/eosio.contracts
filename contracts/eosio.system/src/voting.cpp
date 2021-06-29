@@ -125,7 +125,7 @@ namespace eosiosystem {
       }
 
       top_producers.reserve(target_schedule_size);
-      ADD_DEBUG_LOG_MSG("top producers list size = " + std::to_string(target_schedule_size));
+      //ADD_DEBUG_LOG_MSG("top producers list size = " + std::to_string(target_schedule_size));
 
       auto prods_by_votes_idx = _producers.get_index<"prototalvote"_n>();
       for ( auto it = prods_by_votes_idx.cbegin();
@@ -138,11 +138,11 @@ namespace eosiosystem {
          if (userres_it != userres_tbl.end()) {
             total_staked += userres_it->net_weight + userres_it->cpu_weight + userres_it->vote_weight;
          }
-         ADD_DEBUG_LOG_MSG(it->owner.to_string() + " total staked: " + std::to_string(total_staked.amount));
+         //ADD_DEBUG_LOG_MSG(it->owner.to_string() + " total staked: " + std::to_string(total_staked.amount));
 
          // producer has to stake at least min_producer_activated_stake tokens
          if (total_staked.amount >= min_producer_activated_stake) {
-            ADD_DEBUG_LOG_MSG("added " + it->owner.to_string() + " to schedule");
+            //ADD_DEBUG_LOG_MSG("added " + it->owner.to_string() + " to schedule");
             top_producers.emplace_back( std::pair<eosio::producer_key,uint16_t>({{it->owner, it->producer_key}, it->location}) );
          }
       }
@@ -247,7 +247,7 @@ namespace eosiosystem {
          if( _gstate.total_activated_stake >= min_activated_stake ) {
             _gstate.thresh_activated_stake_time = current_time_point();
          }
-         ADD_DEBUG_LOG_MSG("_gstate.thresh_activated_stake_time = " + std::to_string(_gstate.thresh_activated_stake_time.sec_since_epoch()));
+         //ADD_DEBUG_LOG_MSG("_gstate.thresh_activated_stake_time = " + std::to_string(_gstate.thresh_activated_stake_time.sec_since_epoch()));
       }
 
       auto new_vote_weight = stake2vote( voter->staked );
