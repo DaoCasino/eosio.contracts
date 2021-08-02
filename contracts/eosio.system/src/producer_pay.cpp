@@ -82,13 +82,7 @@ namespace eosiosystem {
    ///@{
    ///DAO
    double get_target_emission_rate_per_year(double activated_share) {
-      if (activated_share <= 0.33) {
-         return 0.2;
-      } else if (activated_share >= 0.66) {
-         return 0.1;
-      }
-      // descending linear function from 0.33 to 0.66
-      return -10. / 33 * (activated_share - 0.33) + 0.2;
+      return 0.0; // no token emission
    }
 
    ///DAO: continuous rate formulae (#4)
